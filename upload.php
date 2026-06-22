@@ -249,7 +249,7 @@ function importPdf(string $path): array
         ':destination' => nullableText($raw['destination'] ?? null),
         ':edd' => nullableText($raw['pdfdate'] ?? null),
         ':wo_qty' => nullableNumber($raw['woqty'] ?? null),
-        ':duct_weight' => nullableNumber($raw['ductweight'] ?? null),
+        ':duct_weight' => null,
         ':mnf_weight' => nullableNumber($raw['mnfweight'] ?? null),
         ':fix_anc_weight' => nullableNumber($raw['fixancweight'] ?? null),
         ':raw_data' => json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),

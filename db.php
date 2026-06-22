@@ -10,7 +10,7 @@ declare(strict_types=1);
 $dbHost = 'localhost';
 $dbName = 'dreport';
 $dbUser = 'root';
-$dbPass = '';
+$dbPass = '@12345678Aa';
 $dbCharset = 'utf8mb4';
 $pythonPath = '';
 
@@ -227,7 +227,7 @@ function repairImportedRawData(PDO $pdo): void
         $dnNumber = nullableSchemaText($raw['dnnumber'] ?? null);
         $destination = nullableSchemaText($raw['destination'] ?? null);
         $woQty = nullableSchemaNumber($raw['woqty'] ?? null);
-        $ductWeight = nullableSchemaNumber($raw['ductweight'] ?? null);
+        $ductWeight = ($raw['source'] ?? null) === 'pdf' ? null : nullableSchemaNumber($raw['ductweight'] ?? null);
         $mnfWeight = nullableSchemaNumber($raw['mnfweight'] ?? null);
         $fixAncWeight = nullableSchemaNumber($raw['fixancweight'] ?? null);
 

@@ -140,13 +140,14 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="7">Grand Totals</td>
+                            <td colspan="5" class="footer-blank"></td>
+                            <td colspan="2" class="grand-label">Grand Totals:</td>
                             <td id="totalWoQty">0 KGs</td>
                             <td id="totalMnf">0 KGs</td>
                             <td id="totalFixAnc">0 KGs</td>
                             <td id="totalShipment">0 KGs</td>
                             <td id="totalMnfQty">0 PCs</td>
-                            <td colspan="5"></td>
+                            <td colspan="5" class="footer-blank"></td>
                         </tr>
                     </tfoot>
                 </table>

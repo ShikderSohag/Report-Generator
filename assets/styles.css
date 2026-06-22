@@ -461,6 +461,29 @@ input[readonly] {
     white-space: nowrap;
 }
 
+.report-table tfoot .footer-blank {
+    background: transparent;
+    border: 0;
+    color: transparent;
+}
+
+.report-table tfoot .grand-label {
+    text-align: right;
+}
+
+.drag-handle {
+    cursor: grab;
+}
+
+.drag-handle::before {
+    content: "⋮⋮ ";
+    color: #475467;
+}
+
+.dragging-row {
+    opacity: 0.55;
+}
+
 .remove-row {
     background: #fff0f0;
     color: #b42318;

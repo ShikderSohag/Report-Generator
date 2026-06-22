@@ -192,8 +192,9 @@ function addReportRow(data) {
     row.dataset.rowKey = rowKey;
     row.dataset.woQty = numberValue(data.duct_weight) || mnfWeight + fixAncWeight;
     row.dataset.mnfQty = numberValue(data.wo_qty);
+    row.draggable = true;
     row.innerHTML = `
-        <td class="serial"></td>
+        <td class="serial drag-handle" title="Drag to reorder"></td>
         <td>
             <div class="main-value">${escapeHtml(data.customer_name || '')}</div>
         </td>
@@ -220,7 +221,13 @@ function addReportRow(data) {
     `;
 
     row.querySelectorAll('.manual-wo-qty, .manual-mnf, .manual-fix, .manual-prev').forEach((input) => {
-        input.addEventListener('input', () => updateRowCalculations(row));
+        input.addEventListener('input', () => {
+            updateRowCalculations(row);
+
+            if (input.classList.contains('manual-wo-qty')) {
+                syncWoQtyAcrossRows(row);
+            }
+        });
     });
 
     row.querySelector('.remove-row').addEventListener('click', () => {
@@ -229,6 +236,29 @@ function addReportRow(data) {
         refreshSerialNumbers();
         showEmptyRowIfNeeded();
         updateGrandTotals();
+    });
+
+    row.addEventListener('dragstart', () => {
+        row.classList.add('dragging-row');
+    });
+
+    row.addEventListener('dragend', () => {
+        row.classList.remove('dragging-row');
+        refreshSerialNumbers();
+        updateCumulativePercentages();
+        updateGrandTotals();
+    });
+
+    row.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        const draggingRow = reportRows.querySelector('.dragging-row');
+        if (!draggingRow || draggingRow === row) {
+            return;
+        }
+
+        const rect = row.getBoundingClientRect();
+        const shouldInsertAfter = event.clientY > rect.top + rect.height / 2;
+        reportRows.insertBefore(draggingRow, shouldInsertAfter ? row.nextSibling : row);
     });
 
     reportRows.appendChild(row);
@@ -270,7 +300,7 @@ function mergeDelivery(baseData, delivery) {
         project_name: delivery.project_name || baseData.project_name,
         edd: delivery.edd || baseData.edd,
         wo_qty: delivery.wo_qty || baseData.wo_qty,
-        duct_weight: delivery.duct_weight || baseData.duct_weight,
+        duct_weight: baseData.duct_weight || delivery.duct_weight,
         mnf_weight: delivery.mnf_weight || baseData.mnf_weight,
         fix_anc_weight: delivery.fix_anc_weight || baseData.fix_anc_weight,
     };
@@ -308,16 +338,45 @@ function updateRowCalculations(row) {
     row.dataset.woQty = woQty;
     const mnf = numberValue(row.querySelector('.manual-mnf').value);
     const fixAnc = numberValue(row.querySelector('.manual-fix').value);
-    const previousPercent = numberValue(row.querySelector('.manual-prev').value);
     const shipmentTotal = mnf + fixAnc;
     const shipmentPercent = woQty > 0 ? (mnf / woQty) * 100 : 0;
-    const totalDelivered = previousPercent + shipmentPercent;
 
     row.querySelector('.shipment-total').textContent = formatKg(shipmentTotal);
     row.querySelector('.shipment-percent').textContent = formatPercent(shipmentPercent);
-    row.querySelector('.delivered-total').textContent = formatPercent(totalDelivered);
 
+    updateCumulativePercentages();
     updateGrandTotals();
+}
+
+function updateCumulativePercentages() {
+    const cumulativeByWo = new Map();
+
+    reportRows.querySelectorAll('tr:not(.empty-row)').forEach((row) => {
+        const woNo = row.dataset.woNo;
+        const previousPercent = numberValue(row.querySelector('.manual-prev').value);
+        const currentPercent = numberValue(row.querySelector('.shipment-percent').textContent);
+        const runningPercent = cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : previousPercent;
+        const totalDelivered = runningPercent + currentPercent;
+
+        row.querySelector('.delivered-total').textContent = formatPercent(totalDelivered);
+        cumulativeByWo.set(woNo, totalDelivered);
+    });
+}
+
+function syncWoQtyAcrossRows(sourceRow) {
+    const sourceWoNo = sourceRow.dataset.woNo;
+    const value = sourceRow.querySelector('.manual-wo-qty').value;
+
+    reportRows.querySelectorAll('tr:not(.empty-row)').forEach((row) => {
+        if (row === sourceRow || row.dataset.woNo !== sourceWoNo) {
+            return;
+        }
+
+        row.querySelector('.manual-wo-qty').value = value;
+        updateRowCalculations(row);
+    });
+
+    updateCumulativePercentages();
 }
 
 function updateGrandTotals() {
@@ -553,13 +612,14 @@ function exportPdf(rows) {
                 <tbody>${bodyRows}</tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="7">Grand Totals</td>
+                        <td colspan="5" style="background: transparent; border: 0;"></td>
+                        <td colspan="2">Grand Totals:</td>
                         <td>${escapeHtml(totalWoQty.textContent)}</td>
                         <td>${escapeHtml(totalMnf.textContent)}</td>
                         <td>${escapeHtml(totalFixAnc.textContent)}</td>
                         <td>${escapeHtml(totalShipment.textContent)}</td>
                         <td>${escapeHtml(totalMnfQty.textContent)}</td>
-                        <td colspan="4"></td>
+                        <td colspan="4" style="background: transparent; border: 0;"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -600,8 +660,7 @@ function formatKg(value) {
 
 function formatPercent(value) {
     const percent = numberValue(value);
-    const decimals = Number.isInteger(percent) ? 0 : 1;
-    return `${percent.toFixed(decimals)}%`;
+    return `${Math.round(percent)}%`;
 }
 
 function formatPcs(value) {
