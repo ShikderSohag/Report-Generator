@@ -358,6 +358,36 @@ input[readonly] {
     width: 4%;
 }
 
+.active-col-serial {
+    width: 4%;
+}
+
+.active-col-wo {
+    width: 8%;
+}
+
+.active-col-customer {
+    width: 24%;
+}
+
+.active-col-date {
+    width: 8%;
+}
+
+.active-col-status,
+.active-col-finish {
+    width: 8%;
+}
+
+.active-col-note,
+.active-col-destination {
+    width: 9%;
+}
+
+.active-col-number {
+    width: 6%;
+}
+
 .report-table th,
 .report-table td {
     border: 1px solid #111827;
@@ -481,6 +511,16 @@ input[readonly] {
 
 .report-table tfoot .grand-label {
     text-align: right;
+}
+
+.active-work-order-table tfoot td {
+    background: #fff2cc;
+    color: #111827;
+}
+
+.active-work-order-table tfoot .footer-blank {
+    background: transparent;
+    border: 0;
 }
 
 .drag-handle {

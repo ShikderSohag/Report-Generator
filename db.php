@@ -238,6 +238,7 @@ function ensureSchema(PDO $pdo): void
 
     normalizeStoredWorkOrderNumbers($pdo);
     repairImportedRawData($pdo);
+    syncActiveWorkOrdersFromRawData($pdo);
 }
 
 function normalizeStoredWorkOrderNumbers(PDO $pdo): void
@@ -321,6 +322,63 @@ function repairImportedRawData(PDO $pdo): void
             ':mnf_weight' => $mnfWeight,
             ':fix_anc_weight' => $fixAncWeight,
             ':id' => $row['id'],
+        ]);
+    }
+}
+
+function syncActiveWorkOrdersFromRawData(PDO $pdo): void
+{
+    $rows = $pdo->query("
+        SELECT wo_no, raw_data
+        FROM work_orders
+        WHERE raw_data IS NOT NULL
+    ")->fetchAll();
+
+    $upsert = $pdo->prepare('
+        INSERT INTO active_work_orders
+            (wo_no, customer_name, edd, prod_started_date, status, finish, prod_sup_note,
+             destination, duct_area, duct_weight, wo_qty, raw_data)
+        VALUES
+            (:wo_no, :customer_name, :edd, :prod_started_date, :status, :finish, :prod_sup_note,
+             :destination, :duct_area, :duct_weight, :wo_qty, :raw_data)
+        ON DUPLICATE KEY UPDATE
+            customer_name = COALESCE(VALUES(customer_name), customer_name),
+            edd = COALESCE(VALUES(edd), edd),
+            prod_started_date = COALESCE(VALUES(prod_started_date), prod_started_date),
+            status = COALESCE(VALUES(status), status),
+            finish = COALESCE(VALUES(finish), finish),
+            prod_sup_note = COALESCE(VALUES(prod_sup_note), prod_sup_note),
+            destination = COALESCE(VALUES(destination), destination),
+            duct_area = COALESCE(VALUES(duct_area), duct_area),
+            duct_weight = COALESCE(VALUES(duct_weight), duct_weight),
+            wo_qty = COALESCE(VALUES(wo_qty), wo_qty),
+            raw_data = COALESCE(VALUES(raw_data), raw_data)
+    ');
+
+    foreach ($rows as $row) {
+        $raw = json_decode((string) $row['raw_data'], true);
+        if (!is_array($raw) || !array_key_exists('status', $raw)) {
+            continue;
+        }
+
+        $woNo = canonicalWorkOrderNumber($row['wo_no']);
+        if ($woNo === '') {
+            continue;
+        }
+
+        $upsert->execute([
+            ':wo_no' => $woNo,
+            ':customer_name' => nullableSchemaText($raw['customer'] ?? null),
+            ':edd' => nullableSchemaText($raw['edd'] ?? null),
+            ':prod_started_date' => nullableSchemaText($raw['prodstarteddate'] ?? null),
+            ':status' => nullableSchemaText($raw['status'] ?? null),
+            ':finish' => nullableSchemaText($raw['finish'] ?? null),
+            ':prod_sup_note' => nullableSchemaText($raw['prodsupnote'] ?? null),
+            ':destination' => nullableSchemaText($raw['destination'] ?? null),
+            ':duct_area' => nullableSchemaNumber($raw['ductarea'] ?? null),
+            ':duct_weight' => nullableSchemaNumber($raw['ductweight'] ?? null),
+            ':wo_qty' => nullableSchemaNumber($raw['woqty'] ?? null),
+            ':raw_data' => json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ]);
     }
 }
