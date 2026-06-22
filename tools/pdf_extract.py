@@ -11,7 +11,13 @@ def extract_text(path):
             pages = [page.extract_text() or "" for page in pdf.pages]
         return "\n".join(pages), len(pages)
     except Exception:
-        from pypdf import PdfReader
+        try:
+            from pypdf import PdfReader
+        except Exception:
+            try:
+                from pypdf._reader import PdfReader
+            except Exception:
+                from PyPDF2 import PdfReader
 
         reader = PdfReader(path)
         pages = [page.extract_text() or "" for page in reader.pages]

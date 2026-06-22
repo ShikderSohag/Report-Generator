@@ -8,11 +8,11 @@ declare(strict_types=1);
  */
 
 $dbHost = 'localhost';
-$dbName = 'dreport';
-$dbUser = 'root';
-$dbPass = '@12345678Aa';
+$dbName = 'aqdfxhnuxo_dreports';
+$dbUser = 'aqdfxhnuxo_dreports';
+$dbPass = "ysG4c'6x6!cK:&S";
 $dbCharset = 'utf8mb4';
-$pythonPath = '';
+$pythonPath = '/home/aqdfxhnuxo/virtualenv/app.ducty.shop/Report-Generator/3.9/bin/python';
 
 function db(): PDO
 {
@@ -133,6 +133,63 @@ function ensureSchema(PDO $pdo): void
             KEY idx_delivery_report_items_report_id (report_id),
             CONSTRAINT fk_delivery_report_items_report
                 FOREIGN KEY (report_id) REFERENCES delivery_reports(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS active_work_orders (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            wo_no VARCHAR(80) NOT NULL,
+            customer_name VARCHAR(255) NULL,
+            edd VARCHAR(80) NULL,
+            prod_started_date VARCHAR(80) NULL,
+            status VARCHAR(80) NULL,
+            finish VARCHAR(120) NULL,
+            prod_sup_note VARCHAR(255) NULL,
+            destination VARCHAR(255) NULL,
+            duct_area DECIMAL(14,3) NULL,
+            duct_weight DECIMAL(14,3) NULL,
+            wo_qty DECIMAL(14,3) NULL,
+            raw_data LONGTEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_active_work_orders_wo_no (wo_no)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS active_work_order_reports (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            report_name VARCHAR(255) NOT NULL,
+            report_date DATE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_active_work_order_reports_name (report_name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS active_work_order_report_items (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            report_id INT UNSIGNED NOT NULL,
+            row_order INT UNSIGNED NOT NULL,
+            wo_no VARCHAR(80) NOT NULL,
+            customer_name VARCHAR(255) NULL,
+            edd VARCHAR(80) NULL,
+            prod_started_date VARCHAR(80) NULL,
+            status VARCHAR(80) NULL,
+            finish VARCHAR(120) NULL,
+            prod_sup_note VARCHAR(255) NULL,
+            destination VARCHAR(255) NULL,
+            duct_area DECIMAL(14,3) NULL,
+            duct_weight DECIMAL(14,3) NULL,
+            wo_qty DECIMAL(14,3) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_active_work_order_report_items_report_id (report_id),
+            CONSTRAINT fk_active_work_order_report_items_report
+                FOREIGN KEY (report_id) REFERENCES active_work_order_reports(id)
                 ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");

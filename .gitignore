@@ -2,3 +2,4 @@ uploads/
 tools/__pycache__/
 *.pyc
 .agents/
+db.php

@@ -24,6 +24,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                 <a href="#upload">Upload</a>
                 <a href="#report">Report</a>
                 <a href="#savedReports">Delivery Reports</a>
+                <a href="active_work_orders.php">Active Work Orders</a>
             </nav>
         </header>
 

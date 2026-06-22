@@ -255,6 +255,8 @@ function importRows(array $rows): array
             ':raw_data' => json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ];
 
+        upsertActiveWorkOrder($pdo, $woNo, $raw);
+
         $lookupValues = workOrderLookupValues($woNo);
         $exists = $pdo->prepare(
             'SELECT id FROM work_orders WHERE wo_no IN (' . implode(',', array_fill(0, count($lookupValues), '?')) . ')
@@ -274,6 +276,47 @@ function importRows(array $rows): array
     }
 
     return ['inserted' => $inserted, 'skipped' => $skipped];
+}
+
+function upsertActiveWorkOrder(PDO $pdo, string $woNo, array $raw): void
+{
+    $status = nullableText(getByHeader($raw, ['status']));
+
+    $statement = $pdo->prepare('
+        INSERT INTO active_work_orders
+            (wo_no, customer_name, edd, prod_started_date, status, finish, prod_sup_note,
+             destination, duct_area, duct_weight, wo_qty, raw_data)
+        VALUES
+            (:wo_no, :customer_name, :edd, :prod_started_date, :status, :finish, :prod_sup_note,
+             :destination, :duct_area, :duct_weight, :wo_qty, :raw_data)
+        ON DUPLICATE KEY UPDATE
+            customer_name = VALUES(customer_name),
+            edd = VALUES(edd),
+            prod_started_date = VALUES(prod_started_date),
+            status = VALUES(status),
+            finish = VALUES(finish),
+            prod_sup_note = VALUES(prod_sup_note),
+            destination = VALUES(destination),
+            duct_area = VALUES(duct_area),
+            duct_weight = VALUES(duct_weight),
+            wo_qty = VALUES(wo_qty),
+            raw_data = VALUES(raw_data)
+    ');
+
+    $statement->execute([
+        ':wo_no' => $woNo,
+        ':customer_name' => nullableText(getByHeader($raw, ['customer'])),
+        ':edd' => nullableText(getByHeader($raw, ['edd'])),
+        ':prod_started_date' => nullableText(getByHeader($raw, ['prodstarteddate'])),
+        ':status' => $status,
+        ':finish' => nullableText(getByHeader($raw, ['finish'])),
+        ':prod_sup_note' => nullableText(getByHeader($raw, ['prodsupnote'])),
+        ':destination' => nullableText(getByHeader($raw, ['destination'])),
+        ':duct_area' => nullableNumber(getByHeader($raw, ['ductarea'])),
+        ':duct_weight' => nullableNumber(getByHeader($raw, ['ductweight'])),
+        ':wo_qty' => nullableNumber(getByHeader($raw, ['woqty'])),
+        ':raw_data' => json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+    ]);
 }
 
 function importPdf(string $path): array
