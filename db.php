@@ -71,7 +71,9 @@ function ensureSchema(PDO $pdo): void
             wo_qty DECIMAL(14,3) NULL,
             duct_weight DECIMAL(14,3) NULL,
             mnf_weight DECIMAL(14,3) NULL,
+            mnf_date VARCHAR(40) NULL,
             fix_anc_weight DECIMAL(14,3) NULL,
+            fix_anc_date VARCHAR(40) NULL,
             raw_data LONGTEXT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -165,6 +167,16 @@ function ensureSchema(PDO $pdo): void
     $fixAncWeightColumn = $pdo->query("SHOW COLUMNS FROM work_orders LIKE 'fix_anc_weight'")->fetch();
     if (!$fixAncWeightColumn) {
         $pdo->exec('ALTER TABLE work_orders ADD COLUMN fix_anc_weight DECIMAL(14,3) NULL AFTER mnf_weight');
+    }
+
+    $mnfDateColumn = $pdo->query("SHOW COLUMNS FROM work_order_deliveries LIKE 'mnf_date'")->fetch();
+    if (!$mnfDateColumn) {
+        $pdo->exec('ALTER TABLE work_order_deliveries ADD COLUMN mnf_date VARCHAR(40) NULL AFTER mnf_weight');
+    }
+
+    $fixAncDateColumn = $pdo->query("SHOW COLUMNS FROM work_order_deliveries LIKE 'fix_anc_date'")->fetch();
+    if (!$fixAncDateColumn) {
+        $pdo->exec('ALTER TABLE work_order_deliveries ADD COLUMN fix_anc_date VARCHAR(40) NULL AFTER fix_anc_weight');
     }
 
     normalizeStoredWorkOrderNumbers($pdo);

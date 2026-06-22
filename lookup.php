@@ -19,7 +19,7 @@ try {
 
     $lookupValues = workOrderLookupValues($woNo);
     $statement = $pdo->prepare('
-        SELECT wo_no, customer_name, project_name, dn_number, destination, edd, wo_qty, duct_weight, mnf_weight, fix_anc_weight
+        SELECT wo_no, customer_name, project_name, dn_number, destination, edd, wo_qty, duct_weight, mnf_weight, fix_anc_weight, raw_data
         FROM work_orders
         WHERE wo_no IN (' . implode(',', array_fill(0, count($lookupValues), '?')) . ')
         ORDER BY CASE WHEN wo_no = ? THEN 0 ELSE 1 END
@@ -34,14 +34,22 @@ try {
         exit;
     }
 
+    if ((float) ($row['duct_weight'] ?? 0) <= 0 && !empty($row['raw_data'])) {
+        $raw = json_decode((string) $row['raw_data'], true);
+        if (is_array($raw) && isset($raw['ductweight']) && is_numeric($raw['ductweight'])) {
+            $row['duct_weight'] = $raw['ductweight'];
+        }
+    }
+    unset($row['raw_data']);
+
     $deliveriesStatement = $pdo->prepare('
-        SELECT dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, fix_anc_weight
+        SELECT dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date
         FROM work_order_deliveries
         WHERE wo_no IN (' . implode(',', array_fill(0, count($lookupValues), '?')) . ')
-        ORDER BY dn_number
     ');
     $deliveriesStatement->execute($lookupValues);
     $deliveries = $deliveriesStatement->fetchAll();
+    $deliveries = withPreviousDeliveryTotals($deliveries);
 
     if (!$deliveries && !empty($row['dn_number'])) {
         $deliveries[] = [
@@ -51,7 +59,10 @@ try {
             'wo_qty' => $row['wo_qty'],
             'duct_weight' => $row['duct_weight'],
             'mnf_weight' => $row['mnf_weight'],
+            'mnf_date' => null,
             'fix_anc_weight' => $row['fix_anc_weight'],
+            'fix_anc_date' => null,
+            'previous_mnf_weight' => 0,
         ];
     }
 
@@ -63,4 +74,37 @@ try {
 } catch (Throwable $exception) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => $exception->getMessage()]);
+}
+
+function withPreviousDeliveryTotals(array $deliveries): array
+{
+    usort($deliveries, static function (array $left, array $right): int {
+        $leftOrder = deliverySortValue($left['dn_number'] ?? '');
+        $rightOrder = deliverySortValue($right['dn_number'] ?? '');
+
+        if ($leftOrder === $rightOrder) {
+            return strnatcasecmp((string) ($left['dn_number'] ?? ''), (string) ($right['dn_number'] ?? ''));
+        }
+
+        return $leftOrder <=> $rightOrder;
+    });
+
+    $previousMnfWeight = 0.0;
+    foreach ($deliveries as &$delivery) {
+        $delivery['previous_mnf_weight'] = $previousMnfWeight;
+        $previousMnfWeight += is_numeric($delivery['mnf_weight'] ?? null) ? (float) $delivery['mnf_weight'] : 0.0;
+    }
+    unset($delivery);
+
+    return $deliveries;
+}
+
+function deliverySortValue(mixed $dnNumber): int
+{
+    $value = strtoupper(trim((string) $dnNumber));
+    if (preg_match('/(?:DN|D|DELIVERY)\s*-?\s*(\d+)/i', $value, $matches)) {
+        return (int) $matches[1];
+    }
+
+    return PHP_INT_MAX;
 }

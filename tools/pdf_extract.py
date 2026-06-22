@@ -111,6 +111,7 @@ def main():
 
     path = sys.argv[1]
     text, pages = extract_text(path)
+    project_name = first_match(r"^Project:\s*(.+)$", text)
     zone_line = first_match(r"^Zone/Area/Floor:\s*(.+)$", text)
     delivery_note = None
     zone = zone_line
@@ -120,7 +121,7 @@ def main():
         if match:
             zone = match.group(1).strip()
             delivery_note = match.group(2).strip()
-    dn_number = parse_dn_number(zone)
+    dn_number = parse_dn_number(zone) or parse_dn_number(project_name)
 
     title = first_match(r"^(Delivery Note \(.+?\))", text)
     is_fixed = bool(title and "Fixed Ancillaries" in title)
@@ -132,7 +133,7 @@ def main():
         "pdf_type": "fixed" if is_fixed else "manufactured",
         "pages": pages,
         "customer": first_match(r"^Customer:\s*(.+)$", text),
-        "projectname": first_match(r"^Project:\s*(.+)$", text),
+        "projectname": project_name,
         "zone": zone,
         "dnnumber": dn_number,
         "wono": delivery_note,

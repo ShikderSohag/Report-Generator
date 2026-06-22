@@ -107,8 +107,8 @@ function importUploadedFile(array $file, string $uploadDir): array
     $originalName = $file['name'];
     $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
 
-    if (!in_array($extension, ['xlsx', 'csv', 'pdf'], true)) {
-        throw new RuntimeException('Only .xlsx, .csv, and .pdf files are supported.');
+    if (!in_array($extension, ['xlsx', 'csv', 'pdf', 'zip'], true)) {
+        throw new RuntimeException('Only .xlsx, .csv, .pdf, and .zip files are supported.');
     }
 
     $safeName = preg_replace('/[^A-Za-z0-9_.-]/', '_', $originalName);
@@ -118,12 +118,79 @@ function importUploadedFile(array $file, string $uploadDir): array
         throw new RuntimeException('Could not save uploaded file.');
     }
 
+    if ($extension === 'zip') {
+        return importZip($targetPath, $uploadDir);
+    }
+
     if ($extension === 'pdf') {
         return importPdf($targetPath);
     }
 
     $rows = $extension === 'csv' ? readCsvRows($targetPath) : readXlsxRows($targetPath);
     return importRows($rows);
+}
+
+function importZip(string $path, string $uploadDir): array
+{
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) {
+        throw new RuntimeException('Could not open ZIP file.');
+    }
+
+    $summary = ['inserted' => 0, 'skipped' => 0];
+    $extractDir = $uploadDir . '/' . pathinfo($path, PATHINFO_FILENAME);
+
+    if (!is_dir($extractDir)) {
+        mkdir($extractDir, 0775, true);
+    }
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $entryName = $zip->getNameIndex($i);
+        if ($entryName === false || str_ends_with($entryName, '/')) {
+            continue;
+        }
+
+        $baseName = basename($entryName);
+        if ($baseName === '' || str_starts_with($baseName, '.')) {
+            continue;
+        }
+
+        $extension = strtolower(pathinfo($baseName, PATHINFO_EXTENSION));
+        if (!in_array($extension, ['xlsx', 'csv', 'pdf'], true)) {
+            continue;
+        }
+
+        $stream = $zip->getStream($entryName);
+        if (!$stream) {
+            continue;
+        }
+
+        $safeName = preg_replace('/[^A-Za-z0-9_.-]/', '_', $baseName);
+        $targetPath = $extractDir . '/' . uniqid('', true) . '_' . $safeName;
+        $target = fopen($targetPath, 'wb');
+
+        if (!$target) {
+            fclose($stream);
+            continue;
+        }
+
+        stream_copy_to_stream($stream, $target);
+        fclose($stream);
+        fclose($target);
+
+        if ($extension === 'pdf') {
+            $result = importPdf($targetPath);
+        } else {
+            $rows = $extension === 'csv' ? readCsvRows($targetPath) : readXlsxRows($targetPath);
+            $result = importRows($rows);
+        }
+
+        $summary['inserted'] += $result['inserted'];
+        $summary['skipped'] += $result['skipped'];
+    }
+
+    $zip->close();
+    return $summary;
 }
 
 function importRows(array $rows): array
@@ -159,7 +226,7 @@ function importRows(array $rows): array
             duct_weight = COALESCE(:duct_weight, duct_weight),
             mnf_weight = COALESCE(:mnf_weight, mnf_weight),
             fix_anc_weight = COALESCE(:fix_anc_weight, fix_anc_weight),
-            raw_data = :raw_data
+            raw_data = COALESCE(raw_data, :raw_data)
         WHERE id = :id
     ');
 
@@ -283,16 +350,18 @@ function upsertDelivery(PDO $pdo, string $woNo, array $raw): void
 
     $insert = $pdo->prepare('
         INSERT INTO work_order_deliveries
-            (wo_no, dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, fix_anc_weight, raw_data)
+            (wo_no, dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date, raw_data)
         VALUES
-            (:wo_no, :dn_number, :project_name, :edd, :wo_qty, :duct_weight, :mnf_weight, :fix_anc_weight, :raw_data)
+            (:wo_no, :dn_number, :project_name, :edd, :wo_qty, :duct_weight, :mnf_weight, :mnf_date, :fix_anc_weight, :fix_anc_date, :raw_data)
         ON DUPLICATE KEY UPDATE
             project_name = COALESCE(VALUES(project_name), project_name),
             edd = COALESCE(VALUES(edd), edd),
             wo_qty = COALESCE(VALUES(wo_qty), wo_qty),
             duct_weight = COALESCE(VALUES(duct_weight), duct_weight),
             mnf_weight = COALESCE(VALUES(mnf_weight), mnf_weight),
+            mnf_date = COALESCE(VALUES(mnf_date), mnf_date),
             fix_anc_weight = COALESCE(VALUES(fix_anc_weight), fix_anc_weight),
+            fix_anc_date = COALESCE(VALUES(fix_anc_date), fix_anc_date),
             raw_data = VALUES(raw_data)
     ');
 
@@ -304,7 +373,9 @@ function upsertDelivery(PDO $pdo, string $woNo, array $raw): void
         ':wo_qty' => nullableNumber($raw['woqty'] ?? null),
         ':duct_weight' => nullableNumber($raw['ductweight'] ?? null),
         ':mnf_weight' => nullableNumber($raw['mnfweight'] ?? null),
+        ':mnf_date' => nullableText(($raw['pdf_type'] ?? null) === 'manufactured' ? ($raw['pdfdate'] ?? null) : null),
         ':fix_anc_weight' => nullableNumber($raw['fixancweight'] ?? null),
+        ':fix_anc_date' => nullableText(($raw['pdf_type'] ?? null) === 'fixed' ? ($raw['pdfdate'] ?? null) : null),
         ':raw_data' => json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
     ]);
 }

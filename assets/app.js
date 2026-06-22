@@ -190,8 +190,10 @@ function addReportRow(data) {
     const fixAncWeight = numberValue(data.fix_anc_weight);
     row.dataset.woNo = normalizedWoNo;
     row.dataset.rowKey = rowKey;
-    row.dataset.woQty = numberValue(data.duct_weight) || mnfWeight + fixAncWeight;
+    row.dataset.woQty = numberValue(data.duct_weight);
     row.dataset.mnfQty = numberValue(data.wo_qty);
+    row.dataset.previousMnfWeight = numberValue(data.previous_mnf_weight);
+    row.dataset.hasDeliveryHistory = data.previous_mnf_weight === undefined || data.previous_mnf_weight === null ? '0' : '1';
     row.draggable = true;
     row.innerHTML = `
         <td class="serial drag-handle" title="Drag to reorder"></td>
@@ -214,18 +216,18 @@ function addReportRow(data) {
         <td class="shipment-total">0 KGs</td>
         <td class="mnf-qty">${formatPcs(data.wo_qty)}</td>
         <td class="shipment-percent">0%</td>
-        <td><input class="cell-input number manual-prev" type="number" min="0" step="1" value="${formatRawNumber(data.previous_delivered_percent || 0)}"></td>
+        <td><input class="cell-input number manual-prev" type="text" value="0" readonly></td>
         <td class="delivered-total">0%</td>
         <td><textarea class="cell-input remark" rows="2" placeholder="Remark">${escapeHtml(data.remark || '')}</textarea></td>
         <td><button class="remove-row" type="button">Remove</button></td>
     `;
 
-    row.querySelectorAll('.manual-wo-qty, .manual-mnf, .manual-fix, .manual-prev').forEach((input) => {
+    row.querySelectorAll('.manual-wo-qty, .manual-mnf, .manual-fix').forEach((input) => {
         input.addEventListener('input', () => {
-            updateRowCalculations(row);
-
             if (input.classList.contains('manual-wo-qty')) {
                 syncWoQtyAcrossRows(row);
+            } else {
+                recalculateAllRows();
             }
         });
     });
@@ -235,7 +237,7 @@ function addReportRow(data) {
         row.remove();
         refreshSerialNumbers();
         showEmptyRowIfNeeded();
-        updateGrandTotals();
+        recalculateAllRows();
     });
 
     row.addEventListener('dragstart', () => {
@@ -245,8 +247,7 @@ function addReportRow(data) {
     row.addEventListener('dragend', () => {
         row.classList.remove('dragging-row');
         refreshSerialNumbers();
-        updateCumulativePercentages();
-        updateGrandTotals();
+        recalculateAllRows();
     });
 
     row.addEventListener('dragover', (event) => {
@@ -263,7 +264,7 @@ function addReportRow(data) {
 
     reportRows.appendChild(row);
     refreshSerialNumbers();
-    updateRowCalculations(row);
+    recalculateAllRows();
 }
 
 function showDnPicker(baseData, deliveries) {
@@ -272,10 +273,10 @@ function showDnPicker(baseData, deliveries) {
         const option = document.createElement('option');
         const labelParts = [delivery.dn_number || `DN ${index + 1}`];
         if (delivery.mnf_weight) {
-            labelParts.push(`MNF ${formatKg(delivery.mnf_weight)}`);
+            labelParts.push(`MNF ${formatKg(delivery.mnf_weight)}${delivery.mnf_date ? ` (${delivery.mnf_date})` : ''}`);
         }
         if (delivery.fix_anc_weight) {
-            labelParts.push(`Fix ${formatKg(delivery.fix_anc_weight)}`);
+            labelParts.push(`Fix ${formatKg(delivery.fix_anc_weight)}${delivery.fix_anc_date ? ` (${delivery.fix_anc_date})` : ''}`);
         }
         option.value = String(index);
         option.textContent = labelParts.join(' - ');
@@ -300,9 +301,10 @@ function mergeDelivery(baseData, delivery) {
         project_name: delivery.project_name || baseData.project_name,
         edd: delivery.edd || baseData.edd,
         wo_qty: delivery.wo_qty || baseData.wo_qty,
-        duct_weight: baseData.duct_weight || delivery.duct_weight,
+        duct_weight: baseData.duct_weight,
         mnf_weight: delivery.mnf_weight || baseData.mnf_weight,
         fix_anc_weight: delivery.fix_anc_weight || baseData.fix_anc_weight,
+        previous_mnf_weight: delivery.previous_mnf_weight,
     };
 }
 
@@ -322,7 +324,7 @@ function refreshSerialNumbers() {
 
 function showEmptyRowIfNeeded() {
     if (reportRows.querySelector('tr')) {
-        updateGrandTotals();
+        recalculateAllRows();
         return;
     }
 
@@ -330,6 +332,15 @@ function showEmptyRowIfNeeded() {
     row.className = 'empty-row';
     row.innerHTML = '<td colspan="17">No work orders added yet.</td>';
     reportRows.appendChild(row);
+    updateGrandTotals();
+}
+
+function recalculateAllRows() {
+    reportRows.querySelectorAll('tr:not(.empty-row)').forEach((row) => {
+        updateRowCalculations(row);
+    });
+
+    updateCumulativePercentages();
     updateGrandTotals();
 }
 
@@ -344,8 +355,7 @@ function updateRowCalculations(row) {
     row.querySelector('.shipment-total').textContent = formatKg(shipmentTotal);
     row.querySelector('.shipment-percent').textContent = formatPercent(shipmentPercent);
 
-    updateCumulativePercentages();
-    updateGrandTotals();
+    row.dataset.currentPercent = shipmentPercent;
 }
 
 function updateCumulativePercentages() {
@@ -353,13 +363,17 @@ function updateCumulativePercentages() {
 
     reportRows.querySelectorAll('tr:not(.empty-row)').forEach((row) => {
         const woNo = row.dataset.woNo;
-        const previousPercent = numberValue(row.querySelector('.manual-prev').value);
-        const currentPercent = numberValue(row.querySelector('.shipment-percent').textContent);
-        const runningPercent = cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : previousPercent;
-        const totalDelivered = runningPercent + currentPercent;
+        const woQty = numberValue(row.querySelector('.manual-wo-qty').value);
+        const databasePreviousPercent = woQty > 0 ? (numberValue(row.dataset.previousMnfWeight) / woQty) * 100 : 0;
+        const previousPercent = row.dataset.hasDeliveryHistory === '1'
+            ? databasePreviousPercent
+            : (cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : 0);
+        const currentPercent = numberValue(row.dataset.currentPercent);
+        const totalDelivered = previousPercent + currentPercent;
 
+        row.querySelector('.manual-prev').value = formatPercent(previousPercent);
         row.querySelector('.delivered-total').textContent = formatPercent(totalDelivered);
-        cumulativeByWo.set(woNo, totalDelivered);
+        cumulativeByWo.set(woNo, Math.max(cumulativeByWo.get(woNo) || 0, totalDelivered));
     });
 }
 
@@ -373,10 +387,9 @@ function syncWoQtyAcrossRows(sourceRow) {
         }
 
         row.querySelector('.manual-wo-qty').value = value;
-        updateRowCalculations(row);
     });
 
-    updateCumulativePercentages();
+    recalculateAllRows();
 }
 
 function updateGrandTotals() {
@@ -447,11 +460,45 @@ function renderSavedReports(reports) {
             <td>${escapeHtml(report.report_name || '')}</td>
             <td>${escapeHtml(report.report_date || '')}</td>
             <td>${escapeHtml(report.updated_at || '')}</td>
-            <td><button class="load-report" type="button">Open</button></td>
+            <td>
+                <button class="load-report" type="button">Open</button>
+                <button class="delete-report" type="button">Delete</button>
+            </td>
         `;
         row.querySelector('.load-report').addEventListener('click', () => loadSavedReport(report.id));
+        row.querySelector('.delete-report').addEventListener('click', () => deleteSavedReport(report.id, report.report_name));
         savedReportRows.appendChild(row);
     });
+}
+
+async function deleteSavedReport(reportId, reportName) {
+    if (!confirm(`Delete ${reportName}?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('delete_report.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: reportId }),
+        });
+        const payload = await response.json();
+
+        if (!response.ok || !payload.success) {
+            savedReportMessage.textContent = payload.message || 'Could not delete report.';
+            return;
+        }
+
+        if (currentReportId.value === String(reportId)) {
+            currentReportId.value = '';
+            saveReport.textContent = 'Save Report';
+        }
+
+        savedReportMessage.textContent = payload.message;
+        loadReportList();
+    } catch (error) {
+        savedReportMessage.textContent = 'Could not delete report.';
+    }
 }
 
 async function loadSavedReport(reportId) {
