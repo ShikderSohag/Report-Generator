@@ -1,0 +1,193 @@
+<?php
+declare(strict_types=1);
+
+require __DIR__ . '/db.php';
+
+header('Content-Type: application/json; charset=utf-8');
+
+$reportDate = trim((string) ($_GET['report_date'] ?? ''));
+
+if ($reportDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportDate)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Report date is required.']);
+    exit;
+}
+
+try {
+    $pdo = db();
+    ensureSchema($pdo);
+
+    $statement = $pdo->query("
+        SELECT
+            d.wo_no,
+            d.dn_number,
+            d.project_name AS delivery_project_name,
+            d.edd,
+            d.wo_qty AS delivery_wo_qty,
+            d.duct_weight AS delivery_duct_weight,
+            d.mnf_weight,
+            d.mnf_date,
+            d.fix_anc_weight,
+            d.fix_anc_date,
+            d.duct_system,
+            d.pid_area,
+            d.pid_supp_rod,
+            d.pid_mnf_qty,
+            d.pid_material,
+            w.customer_name,
+            w.project_name AS work_order_project_name,
+            w.destination,
+            w.duct_weight AS work_order_duct_weight,
+            w.raw_data
+        FROM work_order_deliveries d
+        LEFT JOIN work_orders w ON w.wo_no = d.wo_no
+        ORDER BY d.wo_no ASC, d.dn_number ASC, d.id ASC
+    ");
+
+    $groups = [];
+    foreach ($statement->fetchAll() as $row) {
+        $groups[(string) $row['wo_no']][] = $row;
+    }
+
+    $deliveries = [];
+    foreach ($groups as $rows) {
+        usort($rows, static function (array $left, array $right): int {
+            $leftOrder = deliverySortValue($left['dn_number'] ?? '');
+            $rightOrder = deliverySortValue($right['dn_number'] ?? '');
+
+            if ($leftOrder === $rightOrder) {
+                return strnatcasecmp((string) ($left['dn_number'] ?? ''), (string) ($right['dn_number'] ?? ''));
+            }
+
+            return $leftOrder <=> $rightOrder;
+        });
+
+        $previousMnfWeight = 0.0;
+        $previousPidArea = 0.0;
+
+        foreach ($rows as $row) {
+            $row['previous_mnf_weight'] = $previousMnfWeight;
+            $row['previous_pid_area'] = $previousPidArea;
+
+            if (deliveryMatchesReportDate($row, $reportDate)) {
+                $deliveries[] = deliveryPayload($row);
+            }
+
+            $previousMnfWeight += is_numeric($row['mnf_weight'] ?? null) ? (float) $row['mnf_weight'] : 0.0;
+            $previousPidArea += is_numeric($row['pid_area'] ?? null) ? (float) $row['pid_area'] : 0.0;
+        }
+    }
+
+    echo json_encode([
+        'success' => true,
+        'report_date' => $reportDate,
+        'deliveries' => $deliveries,
+    ], JSON_UNESCAPED_UNICODE);
+} catch (Throwable $exception) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => $exception->getMessage()]);
+}
+
+function deliveryPayload(array $row): array
+{
+    $raw = json_decode((string) ($row['raw_data'] ?? ''), true);
+    $raw = is_array($raw) ? $raw : [];
+    $ductSystem = strtolower(trim((string) ($row['duct_system'] ?? ''))) === 'pid' ? 'pid' : 'metal';
+    $woNo = (string) ($row['wo_no'] ?? '');
+    $displayDeliveryNote = preg_replace('/^W/i', '', $woNo);
+
+    if ($ductSystem === 'pid') {
+        return [
+            'wo_no' => $displayDeliveryNote,
+            'delivery_note' => $displayDeliveryNote,
+            'customer_name' => $row['customer_name'] ?? null,
+            'project_name' => $row['delivery_project_name'] ?: ($row['work_order_project_name'] ?? null),
+            'dn_number' => $row['dn_number'] ?? null,
+            'added_to_delivery' => 'Yes',
+            'duct_system' => 'pid',
+            'pid_area' => nullablePayloadNumber($row['pid_area'] ?? $row['mnf_weight'] ?? null),
+            'pid_supp_rod' => nullablePayloadNumber($row['pid_supp_rod'] ?? null),
+            'pid_mnf_qty' => nullablePayloadNumber($row['pid_mnf_qty'] ?? $row['delivery_wo_qty'] ?? null),
+            'pid_material' => $row['pid_material'] ?? null,
+            'previous_pid_area' => nullablePayloadNumber($row['previous_pid_area'] ?? 0),
+        ];
+    }
+
+    $workOrderWeight = nullablePayloadNumber($row['work_order_duct_weight'] ?? null);
+    if (($workOrderWeight ?? 0) <= 0 && isset($raw['ductweight'])) {
+        $workOrderWeight = nullablePayloadNumber($raw['ductweight']);
+    }
+    if (($workOrderWeight ?? 0) <= 0) {
+        $workOrderWeight = nullablePayloadNumber($row['delivery_duct_weight'] ?? $row['mnf_weight'] ?? null);
+    }
+
+    return [
+        'wo_no' => $displayDeliveryNote,
+        'delivery_note' => $displayDeliveryNote,
+        'customer_name' => $row['customer_name'] ?? null,
+        'project_name' => $row['delivery_project_name'] ?: ($row['work_order_project_name'] ?? null),
+        'dn_number' => $row['dn_number'] ?? null,
+        'destination' => $row['destination'] ?? null,
+        'added_to_delivery' => 'Yes',
+        'duct_system' => 'metal',
+        'duct_weight' => $workOrderWeight,
+        'wo_qty' => nullablePayloadNumber($row['delivery_wo_qty'] ?? null),
+        'mnf_weight' => nullablePayloadNumber($row['mnf_weight'] ?? null),
+        'fix_anc_weight' => nullablePayloadNumber($row['fix_anc_weight'] ?? null),
+        'previous_mnf_weight' => nullablePayloadNumber($row['previous_mnf_weight'] ?? 0),
+    ];
+}
+
+function deliveryMatchesReportDate(array $row, string $reportDate): bool
+{
+    foreach (['edd', 'mnf_date', 'fix_anc_date'] as $field) {
+        if (normalizeDeliveryDate($row[$field] ?? null) === $reportDate) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function normalizeDeliveryDate(mixed $value): ?string
+{
+    $value = trim((string) $value);
+    if ($value === '') {
+        return null;
+    }
+
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+        return $value;
+    }
+
+    $formats = ['!n/j/Y', '!m/d/Y', '!d/m/Y', '!j/n/Y', '!d-M-Y', '!j-M-Y'];
+    foreach ($formats as $format) {
+        $date = DateTime::createFromFormat($format, $value);
+        if ($date instanceof DateTime) {
+            return $date->format('Y-m-d');
+        }
+    }
+
+    $timestamp = strtotime($value);
+    return $timestamp === false ? null : date('Y-m-d', $timestamp);
+}
+
+function deliverySortValue(mixed $dnNumber): int
+{
+    $value = strtoupper(trim((string) $dnNumber));
+    if (preg_match('/(?:DN|D|DELIVERY)\s*-?\s*(\d+)/i', $value, $matches)) {
+        return (int) $matches[1];
+    }
+
+    return PHP_INT_MAX;
+}
+
+function nullablePayloadNumber(mixed $value): ?float
+{
+    if ($value === null || $value === '') {
+        return null;
+    }
+
+    $number = str_replace(',', '', trim((string) $value));
+    return is_numeric($number) ? (float) $number : null;
+}

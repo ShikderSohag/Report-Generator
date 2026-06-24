@@ -9,6 +9,7 @@ const dnSelect = document.querySelector('#dnSelect');
 const addSelectedDn = document.querySelector('#addSelectedDn');
 const exportReport = document.querySelector('#exportReport');
 const saveReport = document.querySelector('#saveReport');
+const autoloadDeliveryNotes = document.querySelector('#autoloadDeliveryNotes');
 const currentReportId = document.querySelector('#currentReportId');
 const refreshReports = document.querySelector('#refreshReports');
 const savedReportRows = document.querySelector('#savedReportRows');
@@ -136,6 +137,12 @@ if (addAncillaryRow) {
     });
 }
 
+if (autoloadDeliveryNotes) {
+    autoloadDeliveryNotes.addEventListener('click', () => {
+        loadDeliveryNotesForReportDate(false);
+    });
+}
+
 if (exportReport) {
     exportReport.addEventListener('click', () => {
         const rows = [...reportRows.querySelectorAll('tr:not(.empty-row)')];
@@ -191,7 +198,10 @@ if (refreshReports) {
     refreshReports.addEventListener('click', loadReportList);
 }
 
-document.addEventListener('DOMContentLoaded', loadReportList);
+document.addEventListener('DOMContentLoaded', () => {
+    loadReportList();
+    loadDeliveryNotesForReportDate(true);
+});
 
 function addLookupRow(data) {
     if (String(data.duct_system || '').toLowerCase() === 'pid') {
@@ -200,6 +210,58 @@ function addLookupRow(data) {
     }
 
     addReportRow(data);
+}
+
+async function loadDeliveryNotesForReportDate(isAutomatic = false) {
+    const reportDate = document.querySelector('#report_date')?.value;
+    if (!reportDate) {
+        return;
+    }
+
+    if (
+        isAutomatic
+        && (
+            reportRows.querySelector('tr:not(.empty-row)')
+            || pidRows.querySelector('tr:not(.empty-row)')
+            || currentReportId.value
+        )
+    ) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`autoload_delivery_notes.php?report_date=${encodeURIComponent(reportDate)}`);
+        const payload = await response.json();
+
+        if (!response.ok || !payload.success) {
+            if (!isAutomatic) {
+                lookupMessage.textContent = payload.message || 'Could not load delivery notes.';
+            }
+            return;
+        }
+
+        let added = 0;
+        let skipped = 0;
+        (payload.deliveries || []).forEach((delivery) => {
+            if (isAlreadyAdded(delivery)) {
+                skipped++;
+                return;
+            }
+
+            addLookupRow(delivery);
+            added++;
+        });
+
+        if (!isAutomatic || added > 0) {
+            lookupMessage.textContent = added
+                ? `Loaded ${added} delivery note(s) for ${reportDate}${skipped ? `, skipped ${skipped} already added.` : '.'}`
+                : `No new delivery notes found for ${reportDate}.`;
+        }
+    } catch (error) {
+        if (!isAutomatic) {
+            lookupMessage.textContent = 'Could not load delivery notes.';
+        }
+    }
 }
 
 function addReportRow(data) {
