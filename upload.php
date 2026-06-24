@@ -282,6 +282,11 @@ function importRows(array $rows): array
             duct_weight = COALESCE(:duct_weight, duct_weight),
             mnf_weight = COALESCE(:mnf_weight, mnf_weight),
             fix_anc_weight = COALESCE(:fix_anc_weight, fix_anc_weight),
+            duct_system = COALESCE(:duct_system, duct_system),
+            pid_area = COALESCE(:pid_area, pid_area),
+            pid_supp_rod = COALESCE(:pid_supp_rod, pid_supp_rod),
+            pid_mnf_qty = COALESCE(:pid_mnf_qty, pid_mnf_qty),
+            pid_material = COALESCE(:pid_material, pid_material),
             raw_data = COALESCE(raw_data, :raw_data)
         WHERE id = :id
     ');
@@ -310,6 +315,11 @@ function importRows(array $rows): array
             ':duct_weight' => nullableNumber(getByHeader($raw, ['ductweight'])),
             ':mnf_weight' => null,
             ':fix_anc_weight' => null,
+            ':duct_system' => nullableText(getByHeader($raw, ['ductsystem'])) ?? 'metal',
+            ':pid_area' => nullableNumber(getByHeader($raw, ['pidarea'])),
+            ':pid_supp_rod' => nullableNumber(getByHeader($raw, ['pidsupprod'])),
+            ':pid_mnf_qty' => nullableNumber(getByHeader($raw, ['pidmnfqty'])),
+            ':pid_material' => nullableText(getByHeader($raw, ['pidmaterial'])),
             ':raw_data' => json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ];
 
@@ -416,8 +426,12 @@ function importPdf(string $path): array
 
     $exists = $pdo->prepare('SELECT id FROM work_orders WHERE wo_no = ? LIMIT 1');
     $insert = $pdo->prepare('
-        INSERT INTO work_orders (wo_no, customer_name, project_name, dn_number, destination, edd, wo_qty, duct_weight, mnf_weight, fix_anc_weight, raw_data)
-        VALUES (:wo_no, :customer_name, :project_name, :dn_number, :destination, :edd, :wo_qty, :duct_weight, :mnf_weight, :fix_anc_weight, :raw_data)
+        INSERT INTO work_orders
+            (wo_no, customer_name, project_name, dn_number, destination, edd, wo_qty, duct_weight,
+             mnf_weight, fix_anc_weight, duct_system, pid_area, pid_supp_rod, pid_mnf_qty, pid_material, raw_data)
+        VALUES
+            (:wo_no, :customer_name, :project_name, :dn_number, :destination, :edd, :wo_qty, :duct_weight,
+             :mnf_weight, :fix_anc_weight, :duct_system, :pid_area, :pid_supp_rod, :pid_mnf_qty, :pid_material, :raw_data)
     ');
     $update = $pdo->prepare('
         UPDATE work_orders
