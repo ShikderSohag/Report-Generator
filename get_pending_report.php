@@ -19,7 +19,7 @@ try {
 
     $reportStatement = $pdo->prepare('
         SELECT id, report_name, report_date
-        FROM delivery_reports
+        FROM pending_work_order_reports
         WHERE id = ?
         LIMIT 1
     ');
@@ -33,36 +33,18 @@ try {
     }
 
     $itemsStatement = $pdo->prepare('
-        SELECT customer_name, project_name, delivery_note, dn_number, destination, added_to_delivery,
-               wo_qty, mnf_weight, fix_anc_weight, mnf_qty, previous_delivered_percent, remark
-        FROM delivery_report_items
+        SELECT wo_no, customer_name, edd, prod_started_date, status, finish, prod_sup_note,
+               destination, duct_area, duct_weight, wo_qty
+        FROM pending_work_order_report_items
         WHERE report_id = ?
         ORDER BY row_order ASC, id ASC
     ');
     $itemsStatement->execute([$reportId]);
-    $pidStatement = $pdo->prepare('
-        SELECT customer_name, project_name, delivery_note, dn_number, added_to_delivery,
-               wo_qty, mnf_area, supp_rod, mnf_qty, previous_delivered_percent, material, remark
-        FROM delivery_report_pid_items
-        WHERE report_id = ?
-        ORDER BY row_order ASC, id ASC
-    ');
-    $pidStatement->execute([$reportId]);
-    $ancillaryStatement = $pdo->prepare('
-        SELECT customer_name, project_name, delivery_note, dn_number, item_no, item_name,
-               qty, previous_delivered_percent, total_delivered_percent, remark
-        FROM delivery_report_ancillary_items
-        WHERE report_id = ?
-        ORDER BY row_order ASC, id ASC
-    ');
-    $ancillaryStatement->execute([$reportId]);
 
     echo json_encode([
         'success' => true,
         'report' => $report,
         'items' => $itemsStatement->fetchAll(),
-        'pid_items' => $pidStatement->fetchAll(),
-        'ancillary_items' => $ancillaryStatement->fetchAll(),
     ], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $exception) {
     http_response_code(500);

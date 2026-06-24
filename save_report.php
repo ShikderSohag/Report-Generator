@@ -13,12 +13,14 @@ try {
 
     $reportDate = trim((string) ($payload['report_date'] ?? ''));
     $items = $payload['items'] ?? [];
+    $pidItems = $payload['pid_items'] ?? [];
+    $ancillaryItems = $payload['ancillary_items'] ?? [];
 
     if ($reportDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportDate)) {
         throw new RuntimeException('Report date is required.');
     }
 
-    if (!is_array($items) || count($items) === 0) {
+    if ((!is_array($items) || count($items) === 0) && (!is_array($pidItems) || count($pidItems) === 0)) {
         throw new RuntimeException('Add at least one report row before saving.');
     }
 
@@ -59,6 +61,8 @@ try {
     }
 
     $pdo->prepare('DELETE FROM delivery_report_items WHERE report_id = ?')->execute([$reportId]);
+    $pdo->prepare('DELETE FROM delivery_report_pid_items WHERE report_id = ?')->execute([$reportId]);
+    $pdo->prepare('DELETE FROM delivery_report_ancillary_items WHERE report_id = ?')->execute([$reportId]);
 
     $insertItem = $pdo->prepare('
         INSERT INTO delivery_report_items
@@ -92,6 +96,72 @@ try {
         ]);
     }
 
+    $insertPidItem = $pdo->prepare('
+        INSERT INTO delivery_report_pid_items
+            (report_id, row_order, customer_name, project_name, delivery_note, dn_number,
+             added_to_delivery, wo_qty, mnf_area, supp_rod, mnf_qty, previous_delivered_percent, material, remark)
+        VALUES
+            (:report_id, :row_order, :customer_name, :project_name, :delivery_note, :dn_number,
+             :added_to_delivery, :wo_qty, :mnf_area, :supp_rod, :mnf_qty, :previous_delivered_percent, :material, :remark)
+    ');
+
+    if (is_array($pidItems)) {
+        foreach (array_values($pidItems) as $index => $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $insertPidItem->execute([
+                ':report_id' => $reportId,
+                ':row_order' => $index + 1,
+                ':customer_name' => nullableReportText($item['customer_name'] ?? null),
+                ':project_name' => nullableReportText($item['project_name'] ?? null),
+                ':delivery_note' => nullableReportText($item['delivery_note'] ?? null),
+                ':dn_number' => nullableReportText($item['dn_number'] ?? null),
+                ':added_to_delivery' => nullableReportText($item['added_to_delivery'] ?? null),
+                ':wo_qty' => nullableReportNumber($item['wo_qty'] ?? null),
+                ':mnf_area' => nullableReportNumber($item['mnf_area'] ?? null),
+                ':supp_rod' => nullableReportNumber($item['supp_rod'] ?? null),
+                ':mnf_qty' => nullableReportNumber($item['mnf_qty'] ?? null),
+                ':previous_delivered_percent' => nullableReportNumber($item['previous_delivered_percent'] ?? null),
+                ':material' => nullableReportText($item['material'] ?? null),
+                ':remark' => nullableReportText($item['remark'] ?? null),
+            ]);
+        }
+    }
+
+    $insertAncillaryItem = $pdo->prepare('
+        INSERT INTO delivery_report_ancillary_items
+            (report_id, row_order, customer_name, project_name, delivery_note, dn_number,
+             item_no, item_name, qty, previous_delivered_percent, total_delivered_percent, remark)
+        VALUES
+            (:report_id, :row_order, :customer_name, :project_name, :delivery_note, :dn_number,
+             :item_no, :item_name, :qty, :previous_delivered_percent, :total_delivered_percent, :remark)
+    ');
+
+    if (is_array($ancillaryItems)) {
+        foreach (array_values($ancillaryItems) as $index => $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+
+            $insertAncillaryItem->execute([
+                ':report_id' => $reportId,
+                ':row_order' => $index + 1,
+                ':customer_name' => nullableReportText($item['customer_name'] ?? null),
+                ':project_name' => nullableReportText($item['project_name'] ?? null),
+                ':delivery_note' => nullableReportText($item['delivery_note'] ?? null),
+                ':dn_number' => nullableReportText($item['dn_number'] ?? null),
+                ':item_no' => nullableReportText($item['item_no'] ?? null),
+                ':item_name' => nullableReportText($item['item_name'] ?? null),
+                ':qty' => nullableReportNumber($item['qty'] ?? null),
+                ':previous_delivered_percent' => nullableReportNumber($item['previous_delivered_percent'] ?? null),
+                ':total_delivered_percent' => nullableReportNumber($item['total_delivered_percent'] ?? null),
+                ':remark' => nullableReportText($item['remark'] ?? null),
+            ]);
+        }
+    }
+
     $pdo->commit();
 
     echo json_encode([
@@ -121,6 +191,6 @@ function nullableReportNumber(mixed $value): ?string
         return null;
     }
 
-    $number = str_replace([',', 'KGs', 'PCs', '%'], '', trim((string) $value));
+    $number = str_replace([',', 'KGs', 'KG', 'PCs', 'PC', 'm²', 'm2', ' M', 'm', '%'], '', trim((string) $value));
     return is_numeric($number) ? $number : null;
 }

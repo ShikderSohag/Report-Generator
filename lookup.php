@@ -19,7 +19,8 @@ try {
 
     $lookupValues = workOrderLookupValues($woNo);
     $statement = $pdo->prepare('
-        SELECT wo_no, customer_name, project_name, dn_number, destination, edd, wo_qty, duct_weight, mnf_weight, fix_anc_weight, raw_data
+        SELECT wo_no, customer_name, project_name, dn_number, destination, edd, wo_qty, duct_weight, mnf_weight,
+               fix_anc_weight, duct_system, pid_area, pid_supp_rod, pid_mnf_qty, pid_material, raw_data
         FROM work_orders
         WHERE wo_no IN (' . implode(',', array_fill(0, count($lookupValues), '?')) . ')
         ORDER BY CASE WHEN wo_no = ? THEN 0 ELSE 1 END
@@ -43,7 +44,8 @@ try {
     unset($row['raw_data']);
 
     $deliveriesStatement = $pdo->prepare('
-        SELECT dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date
+        SELECT dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date,
+               duct_system, pid_area, pid_supp_rod, pid_mnf_qty, pid_material
         FROM work_order_deliveries
         WHERE wo_no IN (' . implode(',', array_fill(0, count($lookupValues), '?')) . ')
     ');
@@ -62,7 +64,13 @@ try {
             'mnf_date' => null,
             'fix_anc_weight' => $row['fix_anc_weight'],
             'fix_anc_date' => null,
+            'duct_system' => $row['duct_system'] ?: 'metal',
+            'pid_area' => $row['pid_area'],
+            'pid_supp_rod' => $row['pid_supp_rod'],
+            'pid_mnf_qty' => $row['pid_mnf_qty'],
+            'pid_material' => $row['pid_material'],
             'previous_mnf_weight' => 0,
+            'previous_pid_area' => 0,
         ];
     }
 
@@ -90,9 +98,12 @@ function withPreviousDeliveryTotals(array $deliveries): array
     });
 
     $previousMnfWeight = 0.0;
+    $previousPidArea = 0.0;
     foreach ($deliveries as &$delivery) {
         $delivery['previous_mnf_weight'] = $previousMnfWeight;
+        $delivery['previous_pid_area'] = $previousPidArea;
         $previousMnfWeight += is_numeric($delivery['mnf_weight'] ?? null) ? (float) $delivery['mnf_weight'] : 0.0;
+        $previousPidArea += is_numeric($delivery['pid_area'] ?? null) ? (float) $delivery['pid_area'] : 0.0;
     }
     unset($delivery);
 

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+date_default_timezone_set('Asia/Riyadh');
+
 /*
  * Put your database credentials here.
  * The app will create the `work_orders` table automatically if it does not exist.
@@ -30,6 +32,7 @@ function db(): PDO
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
+    $pdo->exec("SET time_zone = '+03:00'");
 
     return $pdo;
 }
@@ -74,6 +77,11 @@ function ensureSchema(PDO $pdo): void
             mnf_date VARCHAR(40) NULL,
             fix_anc_weight DECIMAL(14,3) NULL,
             fix_anc_date VARCHAR(40) NULL,
+            duct_system VARCHAR(20) NULL,
+            pid_area DECIMAL(14,3) NULL,
+            pid_supp_rod DECIMAL(14,3) NULL,
+            pid_mnf_qty DECIMAL(14,3) NULL,
+            pid_material VARCHAR(120) NULL,
             raw_data LONGTEXT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -92,6 +100,11 @@ function ensureSchema(PDO $pdo): void
             duct_weight DECIMAL(14,3) NULL,
             mnf_weight DECIMAL(14,3) NULL,
             fix_anc_weight DECIMAL(14,3) NULL,
+            duct_system VARCHAR(20) NULL,
+            pid_area DECIMAL(14,3) NULL,
+            pid_supp_rod DECIMAL(14,3) NULL,
+            pid_mnf_qty DECIMAL(14,3) NULL,
+            pid_material VARCHAR(120) NULL,
             raw_data LONGTEXT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -132,6 +145,56 @@ function ensureSchema(PDO $pdo): void
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             KEY idx_delivery_report_items_report_id (report_id),
             CONSTRAINT fk_delivery_report_items_report
+                FOREIGN KEY (report_id) REFERENCES delivery_reports(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS delivery_report_ancillary_items (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            report_id INT UNSIGNED NOT NULL,
+            row_order INT UNSIGNED NOT NULL,
+            customer_name VARCHAR(255) NULL,
+            project_name VARCHAR(255) NULL,
+            delivery_note VARCHAR(80) NULL,
+            dn_number VARCHAR(40) NULL,
+            item_no VARCHAR(80) NULL,
+            item_name VARCHAR(255) NULL,
+            qty DECIMAL(14,3) NULL,
+            previous_delivered_percent DECIMAL(8,2) NULL,
+            total_delivered_percent DECIMAL(8,2) NULL,
+            remark TEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_delivery_report_ancillary_items_report_id (report_id),
+            CONSTRAINT fk_delivery_report_ancillary_items_report
+                FOREIGN KEY (report_id) REFERENCES delivery_reports(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS delivery_report_pid_items (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            report_id INT UNSIGNED NOT NULL,
+            row_order INT UNSIGNED NOT NULL,
+            customer_name VARCHAR(255) NULL,
+            project_name VARCHAR(255) NULL,
+            delivery_note VARCHAR(80) NULL,
+            dn_number VARCHAR(40) NULL,
+            added_to_delivery VARCHAR(10) NULL,
+            wo_qty DECIMAL(14,3) NULL,
+            mnf_area DECIMAL(14,3) NULL,
+            supp_rod DECIMAL(14,3) NULL,
+            mnf_qty DECIMAL(14,3) NULL,
+            previous_delivered_percent DECIMAL(8,2) NULL,
+            material VARCHAR(120) NULL,
+            remark TEXT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_delivery_report_pid_items_report_id (report_id),
+            CONSTRAINT fk_delivery_report_pid_items_report
                 FOREIGN KEY (report_id) REFERENCES delivery_reports(id)
                 ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -194,6 +257,42 @@ function ensureSchema(PDO $pdo): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS pending_work_order_reports (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            report_name VARCHAR(255) NOT NULL,
+            report_date DATE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_pending_work_order_reports_name (report_name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS pending_work_order_report_items (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            report_id INT UNSIGNED NOT NULL,
+            row_order INT UNSIGNED NOT NULL,
+            wo_no VARCHAR(80) NOT NULL,
+            customer_name VARCHAR(255) NULL,
+            edd VARCHAR(80) NULL,
+            prod_started_date VARCHAR(80) NULL,
+            status VARCHAR(80) NULL,
+            finish VARCHAR(120) NULL,
+            prod_sup_note VARCHAR(255) NULL,
+            destination VARCHAR(255) NULL,
+            duct_area DECIMAL(14,3) NULL,
+            duct_weight DECIMAL(14,3) NULL,
+            wo_qty DECIMAL(14,3) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_pending_work_order_report_items_report_id (report_id),
+            CONSTRAINT fk_pending_work_order_report_items_report
+                FOREIGN KEY (report_id) REFERENCES pending_work_order_reports(id)
+                ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
     $destinationColumn = $pdo->query("SHOW COLUMNS FROM work_orders LIKE 'destination'")->fetch();
     if (!$destinationColumn) {
         $projectColumn = $pdo->query("SHOW COLUMNS FROM work_orders LIKE 'project_name'")->fetch();
@@ -226,6 +325,18 @@ function ensureSchema(PDO $pdo): void
         $pdo->exec('ALTER TABLE work_orders ADD COLUMN fix_anc_weight DECIMAL(14,3) NULL AFTER mnf_weight');
     }
 
+    foreach ([
+        'duct_system' => "ALTER TABLE work_orders ADD COLUMN duct_system VARCHAR(20) NULL AFTER fix_anc_weight",
+        'pid_area' => "ALTER TABLE work_orders ADD COLUMN pid_area DECIMAL(14,3) NULL AFTER duct_system",
+        'pid_supp_rod' => "ALTER TABLE work_orders ADD COLUMN pid_supp_rod DECIMAL(14,3) NULL AFTER pid_area",
+        'pid_mnf_qty' => "ALTER TABLE work_orders ADD COLUMN pid_mnf_qty DECIMAL(14,3) NULL AFTER pid_supp_rod",
+        'pid_material' => "ALTER TABLE work_orders ADD COLUMN pid_material VARCHAR(120) NULL AFTER pid_mnf_qty",
+    ] as $column => $sql) {
+        if (!$pdo->query("SHOW COLUMNS FROM work_orders LIKE '{$column}'")->fetch()) {
+            $pdo->exec($sql);
+        }
+    }
+
     $mnfDateColumn = $pdo->query("SHOW COLUMNS FROM work_order_deliveries LIKE 'mnf_date'")->fetch();
     if (!$mnfDateColumn) {
         $pdo->exec('ALTER TABLE work_order_deliveries ADD COLUMN mnf_date VARCHAR(40) NULL AFTER mnf_weight');
@@ -234,6 +345,18 @@ function ensureSchema(PDO $pdo): void
     $fixAncDateColumn = $pdo->query("SHOW COLUMNS FROM work_order_deliveries LIKE 'fix_anc_date'")->fetch();
     if (!$fixAncDateColumn) {
         $pdo->exec('ALTER TABLE work_order_deliveries ADD COLUMN fix_anc_date VARCHAR(40) NULL AFTER fix_anc_weight');
+    }
+
+    foreach ([
+        'duct_system' => "ALTER TABLE work_order_deliveries ADD COLUMN duct_system VARCHAR(20) NULL AFTER fix_anc_date",
+        'pid_area' => "ALTER TABLE work_order_deliveries ADD COLUMN pid_area DECIMAL(14,3) NULL AFTER duct_system",
+        'pid_supp_rod' => "ALTER TABLE work_order_deliveries ADD COLUMN pid_supp_rod DECIMAL(14,3) NULL AFTER pid_area",
+        'pid_mnf_qty' => "ALTER TABLE work_order_deliveries ADD COLUMN pid_mnf_qty DECIMAL(14,3) NULL AFTER pid_supp_rod",
+        'pid_material' => "ALTER TABLE work_order_deliveries ADD COLUMN pid_material VARCHAR(120) NULL AFTER pid_mnf_qty",
+    ] as $column => $sql) {
+        if (!$pdo->query("SHOW COLUMNS FROM work_order_deliveries LIKE '{$column}'")->fetch()) {
+            $pdo->exec($sql);
+        }
     }
 
     normalizeStoredWorkOrderNumbers($pdo);
@@ -342,17 +465,17 @@ function syncActiveWorkOrdersFromRawData(PDO $pdo): void
             (:wo_no, :customer_name, :edd, :prod_started_date, :status, :finish, :prod_sup_note,
              :destination, :duct_area, :duct_weight, :wo_qty, :raw_data)
         ON DUPLICATE KEY UPDATE
-            customer_name = COALESCE(VALUES(customer_name), customer_name),
-            edd = COALESCE(VALUES(edd), edd),
-            prod_started_date = COALESCE(VALUES(prod_started_date), prod_started_date),
-            status = COALESCE(VALUES(status), status),
-            finish = COALESCE(VALUES(finish), finish),
-            prod_sup_note = COALESCE(VALUES(prod_sup_note), prod_sup_note),
-            destination = COALESCE(VALUES(destination), destination),
-            duct_area = COALESCE(VALUES(duct_area), duct_area),
-            duct_weight = COALESCE(VALUES(duct_weight), duct_weight),
-            wo_qty = COALESCE(VALUES(wo_qty), wo_qty),
-            raw_data = COALESCE(VALUES(raw_data), raw_data)
+            customer_name = COALESCE(customer_name, VALUES(customer_name)),
+            edd = COALESCE(edd, VALUES(edd)),
+            prod_started_date = COALESCE(prod_started_date, VALUES(prod_started_date)),
+            status = COALESCE(status, VALUES(status)),
+            finish = COALESCE(finish, VALUES(finish)),
+            prod_sup_note = COALESCE(prod_sup_note, VALUES(prod_sup_note)),
+            destination = COALESCE(destination, VALUES(destination)),
+            duct_area = COALESCE(duct_area, VALUES(duct_area)),
+            duct_weight = COALESCE(duct_weight, VALUES(duct_weight)),
+            wo_qty = COALESCE(wo_qty, VALUES(wo_qty)),
+            raw_data = COALESCE(raw_data, VALUES(raw_data))
     ');
 
     foreach ($rows as $row) {

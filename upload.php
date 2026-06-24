@@ -139,10 +139,64 @@ function importZip(string $path, string $uploadDir): array
 
     $summary = ['inserted' => 0, 'skipped' => 0];
     $extractDir = $uploadDir . '/' . pathinfo($path, PATHINFO_FILENAME);
+    $entries = zipImportEntries($zip);
+    $errors = [];
 
     if (!is_dir($extractDir)) {
         mkdir($extractDir, 0775, true);
     }
+
+    foreach ($entries as $entry) {
+        $stream = $zip->getStream($entry['entry']);
+        if (!$stream) {
+            continue;
+        }
+
+        $safeName = preg_replace('/[^A-Za-z0-9_.-]/', '_', $entry['base']);
+        $targetPath = $extractDir . '/' . uniqid('', true) . '_' . $safeName;
+        $target = fopen($targetPath, 'wb');
+
+        if (!$target) {
+            fclose($stream);
+            continue;
+        }
+
+        stream_copy_to_stream($stream, $target);
+        fclose($stream);
+        fclose($target);
+
+        try {
+            if ($entry['extension'] === 'pdf') {
+                $result = importPdf($targetPath);
+            } else {
+                $rows = $entry['extension'] === 'csv' ? readCsvRows($targetPath) : readXlsxRows($targetPath);
+                $result = importRows($rows);
+            }
+
+            $summary['inserted'] += $result['inserted'];
+            $summary['skipped'] += $result['skipped'];
+        } catch (Throwable $exception) {
+            $summary['skipped']++;
+            $errors[] = $entry['base'] . ': ' . $exception->getMessage();
+        }
+    }
+
+    $zip->close();
+
+    if ($summary['inserted'] === 0 && $summary['skipped'] === 0) {
+        throw new RuntimeException('No supported Excel, CSV, MNF PDF, or FIX PDF files were found in the ZIP.');
+    }
+
+    if ($summary['inserted'] === 0 && $errors) {
+        throw new RuntimeException('Could not import selected ZIP files. Details: ' . implode(' | ', $errors));
+    }
+
+    return $summary;
+}
+
+function zipImportEntries(ZipArchive $zip): array
+{
+    $entries = [];
 
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $entryName = $zip->getNameIndex($i);
@@ -160,37 +214,35 @@ function importZip(string $path, string $uploadDir): array
             continue;
         }
 
-        $stream = $zip->getStream($entryName);
-        if (!$stream) {
-            continue;
-        }
-
-        $safeName = preg_replace('/[^A-Za-z0-9_.-]/', '_', $baseName);
-        $targetPath = $extractDir . '/' . uniqid('', true) . '_' . $safeName;
-        $target = fopen($targetPath, 'wb');
-
-        if (!$target) {
-            fclose($stream);
-            continue;
-        }
-
-        stream_copy_to_stream($stream, $target);
-        fclose($stream);
-        fclose($target);
-
-        if ($extension === 'pdf') {
-            $result = importPdf($targetPath);
-        } else {
-            $rows = $extension === 'csv' ? readCsvRows($targetPath) : readXlsxRows($targetPath);
-            $result = importRows($rows);
-        }
-
-        $summary['inserted'] += $result['inserted'];
-        $summary['skipped'] += $result['skipped'];
+        $entries[] = [
+            'entry' => $entryName,
+            'base' => $baseName,
+            'extension' => $extension,
+            'is_delivery_pdf' => $extension === 'pdf' && isDeliveryNotePdfName($baseName),
+        ];
     }
 
-    $zip->close();
-    return $summary;
+    $deliveryPdfEntries = array_values(array_filter(
+        $entries,
+        static fn (array $entry): bool => $entry['is_delivery_pdf']
+    ));
+
+    if ($deliveryPdfEntries) {
+        return array_values(array_filter(
+            $entries,
+            static fn (array $entry): bool => $entry['extension'] !== 'pdf' || $entry['is_delivery_pdf']
+        ));
+    }
+
+    return $entries;
+}
+
+function isDeliveryNotePdfName(string $fileName): bool
+{
+    $name = strtolower(pathinfo($fileName, PATHINFO_FILENAME));
+    $name = preg_replace('/[^a-z0-9]+/', ' ', $name);
+
+    return preg_match('/\b(mnf|manufactured|fix|fixed|anc|ancillary|ancillaries)\b/', $name) === 1;
 }
 
 function importRows(array $rows): array
@@ -211,8 +263,12 @@ function importRows(array $rows): array
 
     $exists = $pdo->prepare('SELECT id FROM work_orders WHERE wo_no = ? LIMIT 1');
     $insert = $pdo->prepare('
-        INSERT INTO work_orders (wo_no, customer_name, project_name, dn_number, destination, edd, wo_qty, duct_weight, mnf_weight, fix_anc_weight, raw_data)
-        VALUES (:wo_no, :customer_name, :project_name, :dn_number, :destination, :edd, :wo_qty, :duct_weight, :mnf_weight, :fix_anc_weight, :raw_data)
+        INSERT INTO work_orders
+            (wo_no, customer_name, project_name, dn_number, destination, edd, wo_qty, duct_weight,
+             mnf_weight, fix_anc_weight, duct_system, pid_area, pid_supp_rod, pid_mnf_qty, pid_material, raw_data)
+        VALUES
+            (:wo_no, :customer_name, :project_name, :dn_number, :destination, :edd, :wo_qty, :duct_weight,
+             :mnf_weight, :fix_anc_weight, :duct_system, :pid_area, :pid_supp_rod, :pid_mnf_qty, :pid_material, :raw_data)
     ');
     $update = $pdo->prepare('
         UPDATE work_orders
@@ -232,6 +288,8 @@ function importRows(array $rows): array
 
     $inserted = 0;
     $skipped = 0;
+    $importedActiveWorkOrders = [];
+    $hasActiveWorkOrderColumns = isset($columnMap['status'], $columnMap['ductarea'], $columnMap['ductweight']);
 
     foreach ($rows as $row) {
         $raw = rowToAssoc($headers, $row);
@@ -256,6 +314,9 @@ function importRows(array $rows): array
         ];
 
         upsertActiveWorkOrder($pdo, $woNo, $raw);
+        if ($hasActiveWorkOrderColumns) {
+            $importedActiveWorkOrders[] = $woNo;
+        }
 
         $lookupValues = workOrderLookupValues($woNo);
         $exists = $pdo->prepare(
@@ -275,7 +336,29 @@ function importRows(array $rows): array
         $inserted++;
     }
 
+    if ($hasActiveWorkOrderColumns) {
+        markMissingActiveWorkOrdersFinished($pdo, $importedActiveWorkOrders);
+    }
+
     return ['inserted' => $inserted, 'skipped' => $skipped];
+}
+
+function markMissingActiveWorkOrdersFinished(PDO $pdo, array $importedWorkOrders): void
+{
+    $importedWorkOrders = array_values(array_unique(array_filter($importedWorkOrders)));
+
+    if (!$importedWorkOrders) {
+        return;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($importedWorkOrders), '?'));
+    $statement = $pdo->prepare("
+        UPDATE active_work_orders
+        SET status = 'Production Finished'
+        WHERE wo_no NOT IN ({$placeholders})
+          AND UPPER(TRIM(REPLACE(REPLACE(COALESCE(status, ''), CHAR(13), ' '), CHAR(10), ' '))) NOT IN ('PRODUCTION FINISHED', 'PACKING FINISHED')
+    ");
+    $statement->execute($importedWorkOrders);
 }
 
 function upsertActiveWorkOrder(PDO $pdo, string $woNo, array $raw): void
@@ -348,9 +431,16 @@ function importPdf(string $path): array
             duct_weight = COALESCE(:duct_weight, duct_weight),
             mnf_weight = COALESCE(:mnf_weight, mnf_weight),
             fix_anc_weight = COALESCE(:fix_anc_weight, fix_anc_weight),
+            duct_system = COALESCE(:duct_system, duct_system),
+            pid_area = COALESCE(:pid_area, pid_area),
+            pid_supp_rod = COALESCE(:pid_supp_rod, pid_supp_rod),
+            pid_mnf_qty = COALESCE(:pid_mnf_qty, pid_mnf_qty),
+            pid_material = COALESCE(:pid_material, pid_material),
             raw_data = :raw_data
         WHERE id = :id
     ');
+
+    $isPid = ($raw['duct_system'] ?? null) === 'pid';
 
     $data = [
         ':customer_name' => nullableText($raw['customer'] ?? null),
@@ -359,9 +449,14 @@ function importPdf(string $path): array
         ':destination' => nullableText($raw['destination'] ?? null),
         ':edd' => nullableText($raw['pdfdate'] ?? null),
         ':wo_qty' => nullableNumber($raw['woqty'] ?? null),
-        ':duct_weight' => null,
+        ':duct_weight' => $isPid ? nullableNumber($raw['pidarea'] ?? $raw['ductarea'] ?? null) : null,
         ':mnf_weight' => nullableNumber($raw['mnfweight'] ?? null),
         ':fix_anc_weight' => nullableNumber($raw['fixancweight'] ?? null),
+        ':duct_system' => nullableText($raw['duct_system'] ?? 'metal'),
+        ':pid_area' => nullableNumber($raw['pidarea'] ?? null),
+        ':pid_supp_rod' => nullableNumber($raw['pidsupprod'] ?? null),
+        ':pid_mnf_qty' => nullableNumber($raw['pidmnfqty'] ?? null),
+        ':pid_material' => nullableText($raw['pidmaterial'] ?? null),
         ':raw_data' => json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
     ];
 
@@ -393,9 +488,11 @@ function upsertDelivery(PDO $pdo, string $woNo, array $raw): void
 
     $insert = $pdo->prepare('
         INSERT INTO work_order_deliveries
-            (wo_no, dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date, raw_data)
+            (wo_no, dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date,
+             duct_system, pid_area, pid_supp_rod, pid_mnf_qty, pid_material, raw_data)
         VALUES
-            (:wo_no, :dn_number, :project_name, :edd, :wo_qty, :duct_weight, :mnf_weight, :mnf_date, :fix_anc_weight, :fix_anc_date, :raw_data)
+            (:wo_no, :dn_number, :project_name, :edd, :wo_qty, :duct_weight, :mnf_weight, :mnf_date, :fix_anc_weight, :fix_anc_date,
+             :duct_system, :pid_area, :pid_supp_rod, :pid_mnf_qty, :pid_material, :raw_data)
         ON DUPLICATE KEY UPDATE
             project_name = COALESCE(VALUES(project_name), project_name),
             edd = COALESCE(VALUES(edd), edd),
@@ -405,6 +502,11 @@ function upsertDelivery(PDO $pdo, string $woNo, array $raw): void
             mnf_date = COALESCE(VALUES(mnf_date), mnf_date),
             fix_anc_weight = COALESCE(VALUES(fix_anc_weight), fix_anc_weight),
             fix_anc_date = COALESCE(VALUES(fix_anc_date), fix_anc_date),
+            duct_system = COALESCE(VALUES(duct_system), duct_system),
+            pid_area = COALESCE(VALUES(pid_area), pid_area),
+            pid_supp_rod = COALESCE(VALUES(pid_supp_rod), pid_supp_rod),
+            pid_mnf_qty = COALESCE(VALUES(pid_mnf_qty), pid_mnf_qty),
+            pid_material = COALESCE(VALUES(pid_material), pid_material),
             raw_data = VALUES(raw_data)
     ');
 
@@ -419,6 +521,11 @@ function upsertDelivery(PDO $pdo, string $woNo, array $raw): void
         ':mnf_date' => nullableText(($raw['pdf_type'] ?? null) === 'manufactured' ? ($raw['pdfdate'] ?? null) : null),
         ':fix_anc_weight' => nullableNumber($raw['fixancweight'] ?? null),
         ':fix_anc_date' => nullableText(($raw['pdf_type'] ?? null) === 'fixed' ? ($raw['pdfdate'] ?? null) : null),
+        ':duct_system' => nullableText($raw['duct_system'] ?? 'metal'),
+        ':pid_area' => nullableNumber($raw['pidarea'] ?? null),
+        ':pid_supp_rod' => nullableNumber($raw['pidsupprod'] ?? null),
+        ':pid_mnf_qty' => nullableNumber($raw['pidmnfqty'] ?? null),
+        ':pid_material' => nullableText($raw['pidmaterial'] ?? null),
         ':raw_data' => json_encode($raw, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
     ]);
 }

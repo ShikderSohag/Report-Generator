@@ -513,6 +513,15 @@ input[readonly] {
     text-align: right;
 }
 
+.manual-table-section {
+    margin-top: 22px;
+}
+
+.manual-table-section h3 {
+    font-size: 18px;
+    margin: 0 0 6px;
+}
+
 .active-work-order-table tfoot td {
     background: #fff2cc;
     color: #111827;
@@ -521,6 +530,15 @@ input[readonly] {
 .active-work-order-table tfoot .footer-blank {
     background: transparent;
     border: 0;
+}
+
+.active-work-order-table tbody tr.received-row td {
+    background: #d9d9d9;
+}
+
+.active-work-order-table th {
+    background: #4b5563;
+    color: #ffffff;
 }
 
 .drag-handle {

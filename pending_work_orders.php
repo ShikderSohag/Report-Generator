@@ -10,27 +10,39 @@ $defaultReportDate = date('Y-m-d');
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Active Work Order Exporter</title>
+    <title>Pending Work Order Exporter</title>
     <link rel="stylesheet" href="assets/styles.css">
 </head>
-<body>
+<body
+    data-list-endpoint="list_pending_work_orders.php"
+    data-save-endpoint="save_pending_report.php"
+    data-list-reports-endpoint="list_pending_reports.php"
+    data-get-report-endpoint="get_pending_report.php"
+    data-delete-report-endpoint="delete_pending_report.php"
+    data-export-title="Pending Work Order List"
+    data-empty-text="No pending work orders loaded."
+    data-no-rows-text="No pending work orders are available."
+    data-saved-empty-text="No saved pending reports yet."
+    data-loaded-hash="#pendingExporter"
+    data-highlight-edd="age"
+>
     <main class="shell">
         <header class="topbar">
             <div>
-                <h1>Active Work Order Exporter</h1>
-                <p>Export active work orders from imported Excel data.</p>
+                <h1>Pending Work Order Exporter</h1>
+                <p>Export work orders with EDD up to today from imported Excel data.</p>
             </div>
             <nav>
                 <a href="index.php">Home</a>
-                <a href="pending_work_orders.php">Pending Work Orders</a>
-                <a href="#activeExporter">Exporter</a>
-                <a href="#savedActiveReports">Saved Active Reports</a>
+                <a href="active_work_orders.php">Active Work Orders</a>
+                <a href="#pendingExporter">Exporter</a>
+                <a href="#savedActiveReports">Saved Pending Reports</a>
             </nav>
         </header>
 
-        <section id="activeExporter" class="panel">
+        <section id="pendingExporter" class="panel">
             <div class="report-title">
-                <h2>Active Work Order List</h2>
+                <h2>Pending Work Order List</h2>
                 <div class="report-date">
                     <label for="activeReportDate">Report Date</label>
                     <input id="activeReportDate" type="date" value="<?= htmlspecialchars($defaultReportDate, ENT_QUOTES, 'UTF-8') ?>">
@@ -38,7 +50,7 @@ $defaultReportDate = date('Y-m-d');
             </div>
 
             <div class="section-head compact">
-                <p>Rows with status Production Finished or Packing Finished are excluded.</p>
+                <p>Only rows with EDD up to today are shown. Finished production and packing rows are excluded.</p>
             </div>
 
             <div class="report-actions">
@@ -84,7 +96,7 @@ $defaultReportDate = date('Y-m-d');
                     </thead>
                     <tbody id="activeRows">
                         <tr class="empty-row">
-                            <td colspan="12">No active work orders loaded.</td>
+                            <td colspan="12">No pending work orders loaded.</td>
                         </tr>
                     </tbody>
                     <tfoot>
@@ -102,8 +114,8 @@ $defaultReportDate = date('Y-m-d');
 
         <section id="savedActiveReports" class="panel">
             <div class="section-head">
-                <h2>Active Work Order Reports</h2>
-                <p>Saved active work order snapshots can be reopened, modified, exported, or deleted.</p>
+                <h2>Pending Work Order Reports</h2>
+                <p>Saved pending work order snapshots can be reopened, modified, exported, or deleted.</p>
             </div>
 
             <div class="report-actions">
@@ -124,7 +136,7 @@ $defaultReportDate = date('Y-m-d');
                     </thead>
                     <tbody id="savedActiveRows">
                         <tr>
-                            <td colspan="4">No saved active reports loaded.</td>
+                            <td colspan="4">No saved pending reports loaded.</td>
                         </tr>
                     </tbody>
                 </table>

@@ -3,6 +3,11 @@ import re
 import sys
 
 
+IGNORECASE = re.IGNORECASE
+MULTILINE = re.MULTILINE
+DOTALL = re.DOTALL
+
+
 def extract_text(path):
     try:
         import pdfplumber
@@ -24,7 +29,7 @@ def extract_text(path):
         return "\n".join(pages), len(pages)
 
 
-def first_match(pattern, text, default=None, flags=re.MULTILINE):
+def first_match(pattern, text, default=None, flags=MULTILINE):
     match = re.search(pattern, text, flags)
     return match.group(1).strip() if match else default
 
@@ -47,7 +52,7 @@ def parse_totals(text):
     one_line_rows = re.findall(
         r"^\s*(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*$",
         text,
-        flags=re.MULTILINE,
+        flags=MULTILINE,
     )
     for qty, area, weight in one_line_rows:
         total_qty += number(qty) or 0
@@ -60,7 +65,7 @@ def parse_totals(text):
     qty_area_rows = re.findall(
         r"\n\s*(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*\nName of Receiver:",
         text,
-        flags=re.IGNORECASE,
+        flags=IGNORECASE,
     )
     for qty, area in qty_area_rows:
         total_qty += number(qty) or 0
@@ -69,7 +74,7 @@ def parse_totals(text):
     weight_rows = re.findall(
         r"Page:\s*\d+/\d+\s+Date:.*?Time:.*?\n\s*(\d+(?:\.\d+)?)\s*(?:\n|$)",
         text,
-        flags=re.IGNORECASE,
+        flags=IGNORECASE,
     )
     for weight in weight_rows:
         total_weight += number(weight) or 0
@@ -79,11 +84,10 @@ def parse_totals(text):
 
 def parse_fixed_ancillary_weight(text):
     total_weight = 0.0
-
     rows = re.findall(
         r"^\s*(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*$",
         text,
-        flags=re.MULTILINE,
+        flags=MULTILINE,
     )
 
     for _qty_or_length, weight in rows:
@@ -96,7 +100,7 @@ def parse_dn_number(zone):
     if not zone:
         return None
 
-    match = re.search(r"\(\s*Delivery\s+(.+?)\s*\)", zone, flags=re.IGNORECASE)
+    match = re.search(r"\(\s*Delivery\s+(.+?)\s*\)", zone, flags=IGNORECASE)
     if not match:
         return None
 
@@ -113,8 +117,8 @@ def parse_dn_number(zone):
 
 def is_pid_note(text):
     return bool(
-        re.search(r"\bPanel\s+Type\b", text, flags=re.IGNORECASE)
-        and re.search(r"Total\s+External\s+Area\s*\(m2\)", text, flags=re.IGNORECASE)
+        re.search(r"\bPanel\s+Type\b", text, flags=IGNORECASE)
+        and re.search(r"Total\s+External\s+Area\s*\(m2\)", text, flags=IGNORECASE)
     )
 
 
@@ -122,7 +126,7 @@ def parse_pid_dn_number(text):
     match = re.search(
         r"\bDELIVERY\s+([A-Za-z0-9 -]+?)\s+Total\s+Length\s+of\s+Reinforcement\s+Bars",
         text,
-        flags=re.IGNORECASE,
+        flags=IGNORECASE,
     )
     if not match:
         return None
@@ -141,11 +145,11 @@ def parse_pid_dn_number(text):
 
 def parse_pid_item_qty(text):
     table_text = text
-    header_match = re.search(r"X\s+Y\s+FL\s+MT\s+M2\s+M2\s*\n", text, flags=re.IGNORECASE)
+    header_match = re.search(r"X\s+Y\s+FL\s+MT\s+M2\s+M2\s*\n", text, flags=IGNORECASE)
     if header_match:
         table_text = text[header_match.end():]
 
-    table_text = re.split(r"\bReceived\s+By\b", table_text, maxsplit=1, flags=re.IGNORECASE)[0]
+    table_text = re.split(r"\bReceived\s+By\b", table_text, maxsplit=1, flags=IGNORECASE)[0]
     total_qty = 0.0
 
     for line in table_text.splitlines():
@@ -162,26 +166,27 @@ def parse_pid_item_qty(text):
     return total_qty or None
 
 
-def parse_pid_note(path, text, pages):
-    delivery_note = first_match(r"\bRef\s*#:\s*([A-Za-z0-9-]+)", text, flags=re.IGNORECASE)
-    customer = first_match(r"\bCustomer\s+(.+?)\s+Ref\s*#:", text, flags=re.IGNORECASE)
-    project_name = first_match(r"\bProject\s+(.+?)\s+Floor/Zone/Area\b", text, flags=re.IGNORECASE | re.DOTALL)
-    zone = first_match(r"\bFloor/Zone/Area\s+(.+?)\s+Panel\s+Type\b", text, flags=re.IGNORECASE | re.DOTALL)
+def parse_pid_note(text, pages):
+    delivery_note = first_match(r"\bRef\s*#:\s*([A-Za-z0-9-]+)", text, flags=IGNORECASE)
+    customer = first_match(r"\bCustomer\s+(.+?)\s+Ref\s*#:", text, flags=IGNORECASE)
+    project_name = first_match(r"\bProject\s+(.+?)\s+Floor/Zone/Area\b", text, flags=IGNORECASE | DOTALL)
+    zone = first_match(r"\bFloor/Zone/Area\s+(.+?)\s+Panel\s+Type\b", text, flags=IGNORECASE | DOTALL)
     material = first_match(
         r"\bPanel\s+Type\s+(.+?)\s+Total\s+External\s+Area\s*\(m2\)",
         text,
-        flags=re.IGNORECASE | re.DOTALL,
+        flags=IGNORECASE | DOTALL,
     )
     area = number(first_match(
         r"Total\s+External\s+Area\s*\(m2\)\s*:\s*([0-9,.]+)",
         text,
-        flags=re.IGNORECASE,
+        flags=IGNORECASE,
     ))
     supp_rod = number(first_match(
         r"Total\s+Length\s+of\s+Reinforcement\s+Bars\s*\(m\)\s*:\s*([0-9,.]+)",
         text,
-        flags=re.IGNORECASE,
+        flags=IGNORECASE,
     ))
+    qty = parse_pid_item_qty(text)
 
     if customer:
         customer = re.sub(r"\s+", " ", customer)
@@ -203,14 +208,14 @@ def parse_pid_note(path, text, pages):
         "dnnumber": parse_pid_dn_number(text),
         "wono": delivery_note,
         "deliverynote": delivery_note,
-        "woqty": parse_pid_item_qty(text),
+        "woqty": qty,
         "ductarea": area,
         "ductweight": area,
         "mnfweight": area,
         "fixancweight": None,
         "pidarea": area,
         "pidsupprod": supp_rod,
-        "pidmnfqty": parse_pid_item_qty(text),
+        "pidmnfqty": qty,
         "pidmaterial": material,
         "pdfdate": first_match(r"\b(\d{1,2}/\d{1,2}/\d{4})\b", text),
         "raw_text": text,
@@ -221,11 +226,10 @@ def main():
     if len(sys.argv) < 2:
         raise SystemExit("PDF path is required")
 
-    path = sys.argv[1]
-    text, pages = extract_text(path)
+    text, pages = extract_text(sys.argv[1])
 
     if is_pid_note(text):
-        print(json.dumps(parse_pid_note(path, text, pages), ensure_ascii=False))
+        print(json.dumps(parse_pid_note(text, pages), ensure_ascii=False))
         return
 
     project_name = first_match(r"^Project:\s*(.+)$", text)

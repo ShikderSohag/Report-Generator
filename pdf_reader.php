@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 function readPdfDeliveryNote(string $path): array
 {
-    $script = __DIR__ . '/tools/pdf_extract.py';
+    $safeScript = __DIR__ . '/tools/pdf_extract_safe.py';
+    $script = is_file($safeScript) ? $safeScript : __DIR__ . '/tools/pdf_extract.py';
     if (!is_file($script)) {
         throw new RuntimeException('PDF extractor script was not found.');
     }
@@ -122,12 +123,12 @@ function extractJsonObject(string $output): string
 
 function buildPythonCommand(array $python, array $arguments): string
 {
-    $env = 'PYTHONIOENCODING=utf-8 ';
-
     if (PHP_OS_FAMILY === 'Windows') {
         $pythonPath = 'C:\\Users\\Technical Engineer\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python';
         $env = 'set "PYTHONIOENCODING=utf-8" && set "PYTHONPATH=' . $pythonPath . '" && ';
     } else {
+        $home = getenv('HOME') ?: dirname(dirname(__DIR__));
+        $env = 'HOME=' . escapeshellarg($home) . ' PYTHONIOENCODING=utf-8 ';
         $pythonPaths = array_filter([
             getenv('PDF_PYTHONPATH') ?: null,
             is_dir(__DIR__ . '/python-libs') ? __DIR__ . '/python-libs' : null,

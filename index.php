@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+date_default_timezone_set('Asia/Riyadh');
+
 $message = $_GET['message'] ?? '';
 $error = $_GET['error'] ?? '';
 $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
@@ -25,6 +27,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                 <a href="#report">Report</a>
                 <a href="#savedReports">Delivery Reports</a>
                 <a href="active_work_orders.php">Active Work Orders</a>
+                <a href="pending_work_orders.php">Pending Work Orders</a>
             </nav>
         </header>
 
@@ -152,6 +155,129 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                         </tr>
                     </tfoot>
                 </table>
+            </div>
+
+            <div class="manual-table-section">
+                <div class="section-head compact">
+                    <h3>Pre-Insulated Ducts (PID)</h3>
+                    <p>PID delivery notes are listed separately with area, support rod length, piece count, and material.</p>
+                </div>
+
+                <div class="table-wrap" aria-live="polite">
+                    <table class="report-table pid-table">
+                        <colgroup>
+                            <col class="col-serial">
+                            <col class="col-customer">
+                            <col class="col-project">
+                            <col class="col-delivery">
+                            <col class="col-dn">
+                            <col class="col-added">
+                            <col class="col-qty">
+                            <col class="col-qty">
+                            <col class="col-qty">
+                            <col class="col-qty">
+                            <col class="col-qty">
+                            <col class="col-percent">
+                            <col class="col-percent">
+                            <col class="col-percent">
+                            <col class="col-delivery">
+                            <col class="col-remark">
+                            <col class="col-action">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th rowspan="2">#</th>
+                                <th rowspan="2">Customer</th>
+                                <th rowspan="2">Project</th>
+                                <th rowspan="2">Delivery Note#</th>
+                                <th rowspan="2">DN #</th>
+                                <th rowspan="2">Added to Delivery</th>
+                                <th rowspan="2">WOs Qty</th>
+                                <th colspan="5">Shipment QTYs</th>
+                                <th rowspan="2">Previously Delivered %</th>
+                                <th rowspan="2">Total Delivered %</th>
+                                <th rowspan="2">Duct Type/Material</th>
+                                <th rowspan="2">Remark</th>
+                                <th rowspan="2">Action</th>
+                            </tr>
+                            <tr>
+                                <th>MNF</th>
+                                <th>Supp. Rod</th>
+                                <th>Total</th>
+                                <th>MNF Qty</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pidRows">
+                            <tr class="empty-row">
+                                <td colspan="17">No PID work orders added yet.</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="4" class="footer-blank"></td>
+                                <td colspan="2" class="grand-label">Grand Totals:</td>
+                                <td id="pidTotalWoQty">0 m²</td>
+                                <td id="pidTotalMnf">0 m²</td>
+                                <td id="pidTotalSuppRod">0 m</td>
+                                <td id="pidTotalShipment">0 m²</td>
+                                <td id="pidTotalMnfQty">0 PCs</td>
+                                <td colspan="6" class="footer-blank"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="manual-table-section">
+                <div class="section-head compact">
+                    <h3>Ancillaries</h3>
+                    <p>Add manual ancillary delivery rows when item-level data is not available from uploaded files.</p>
+                </div>
+
+                <div class="report-actions">
+                    <button id="addAncillaryRow" type="button">Add Ancillary Row</button>
+                </div>
+
+                <div class="table-wrap" aria-live="polite">
+                    <table class="report-table ancillary-table">
+                        <colgroup>
+                            <col class="col-serial">
+                            <col class="col-customer">
+                            <col class="col-project">
+                            <col class="col-delivery">
+                            <col class="col-dn">
+                            <col class="col-delivery">
+                            <col class="col-customer">
+                            <col class="col-qty">
+                            <col class="col-percent">
+                            <col class="col-percent">
+                            <col class="col-remark">
+                            <col class="col-action">
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Customer</th>
+                                <th>Project</th>
+                                <th>Delivery Note#</th>
+                                <th>DN #</th>
+                                <th>Item No</th>
+                                <th>ItemName</th>
+                                <th>Qty</th>
+                                <th>Previously Delivered %</th>
+                                <th>Total Delivered %</th>
+                                <th>Remark</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ancillaryRows">
+                            <tr class="empty-row">
+                                <td colspan="12">No ancillary rows added yet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
 
