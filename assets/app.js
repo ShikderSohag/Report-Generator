@@ -290,7 +290,7 @@ function addReportRow(data) {
             <div class="main-value">${escapeHtml(data.customer_name || '')}</div>
         </td>
         <td><input class="cell-input" type="text" placeholder="Project" value="${escapeHtml(data.project_name || '')}"></td>
-        <td>${escapeHtml(data.wo_no || data.delivery_note || '')}</td>
+        <td><input class="cell-input short" type="text" placeholder="Delivery Note" value="${escapeHtml(data.wo_no || data.delivery_note || '')}"></td>
         <td><input class="cell-input short" type="text" placeholder="DN" value="${escapeHtml(data.dn_number || '')}"></td>
         <td><input class="cell-input" type="text" placeholder="Destination" value="${escapeHtml(data.destination || '')}"></td>
         <td>
@@ -387,7 +387,7 @@ function addPidReportRow(data) {
             <div class="main-value">${escapeHtml(data.customer_name || '')}</div>
         </td>
         <td><input class="cell-input" type="text" placeholder="Project" value="${escapeHtml(data.project_name || '')}"></td>
-        <td>${escapeHtml(data.wo_no || data.delivery_note || '')}</td>
+        <td><input class="cell-input short" type="text" placeholder="Delivery Note" value="${escapeHtml(data.wo_no || data.delivery_note || '')}"></td>
         <td><input class="cell-input short" type="text" placeholder="DN" value="${escapeHtml(data.dn_number || '')}"></td>
         <td>
             <select class="cell-input short">
