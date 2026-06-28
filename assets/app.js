@@ -412,12 +412,17 @@ function addReportRow(data) {
     const row = document.createElement('tr');
     const mnfWeight = numberValue(data.mnf_weight);
     const fixAncWeight = numberValue(data.fix_anc_weight);
+    const hasPreviousPercentOverride = data.previous_delivered_percent !== undefined
+        && data.previous_delivered_percent !== null;
     row.dataset.woNo = normalizedWoNo;
     row.dataset.rowKey = rowKey;
     row.dataset.woQty = numberValue(data.duct_weight);
     row.dataset.mnfQty = numberValue(data.wo_qty);
     row.dataset.previousMnfWeight = numberValue(data.previous_mnf_weight);
     row.dataset.hasDeliveryHistory = data.previous_mnf_weight === undefined || data.previous_mnf_weight === null ? '0' : '1';
+    row.dataset.previousPercentOverride = hasPreviousPercentOverride
+        ? String(numberValue(data.previous_delivered_percent))
+        : '';
     row.draggable = true;
     row.innerHTML = `
         <td class="serial drag-handle" title="Drag to reorder"></td>
@@ -440,7 +445,7 @@ function addReportRow(data) {
         <td class="shipment-total">0 KGs</td>
         <td class="mnf-qty">${formatPcs(data.wo_qty)}</td>
         <td class="shipment-percent">0%</td>
-        <td><input class="cell-input number manual-prev" type="text" value="0" readonly></td>
+        <td><input class="cell-input number manual-prev" type="number" min="0" step="0.01" value="${hasPreviousPercentOverride ? formatRawNumber(data.previous_delivered_percent) : '0'}"></td>
         <td class="delivered-total">0%</td>
         <td><textarea class="cell-input remark" rows="2" placeholder="Remark">${escapeHtml(data.remark || '')}</textarea></td>
         <td><button class="remove-row" type="button">Remove</button></td>
@@ -454,6 +459,12 @@ function addReportRow(data) {
                 recalculateAllRows();
             }
         });
+    });
+
+    row.querySelector('.manual-prev').addEventListener('input', (event) => {
+        const value = event.target.value.trim();
+        row.dataset.previousPercentOverride = value === '' ? '' : String(numberValue(value));
+        updateCumulativePercentages();
     });
 
     row.querySelector('.remove-row').addEventListener('click', () => {
@@ -509,6 +520,8 @@ function addPidReportRow(data) {
     const previousPidArea = data.previous_pid_area !== undefined && data.previous_pid_area !== null
         ? numberValue(data.previous_pid_area)
         : (woQty * numberValue(data.previous_delivered_percent) / 100);
+    const hasPreviousPercentOverride = data.previous_delivered_percent !== undefined
+        && data.previous_delivered_percent !== null;
 
     row.dataset.woNo = normalizedWoNo;
     row.dataset.rowKey = rowKey;
@@ -516,6 +529,9 @@ function addPidReportRow(data) {
     row.dataset.mnfQty = mnfQty;
     row.dataset.previousPidArea = previousPidArea;
     row.dataset.hasDeliveryHistory = previousPidArea > 0 || data.previous_pid_area !== undefined ? '1' : '0';
+    row.dataset.previousPercentOverride = hasPreviousPercentOverride
+        ? String(numberValue(data.previous_delivered_percent))
+        : '';
     row.innerHTML = `
         <td class="pid-serial"></td>
         <td>
@@ -536,7 +552,7 @@ function addPidReportRow(data) {
         <td class="pid-shipment-total">0 m²</td>
         <td class="pid-mnf-qty">${formatPcs(mnfQty)}</td>
         <td class="pid-shipment-percent">0%</td>
-        <td><input class="cell-input number pid-prev" type="text" value="0" readonly></td>
+        <td><input class="cell-input number pid-prev" type="number" min="0" step="0.01" value="${hasPreviousPercentOverride ? formatRawNumber(data.previous_delivered_percent) : '0'}"></td>
         <td class="pid-delivered-total">0%</td>
         <td><input class="cell-input short" type="text" placeholder="Material" value="${escapeHtml(data.pid_material || data.material || '')}"></td>
         <td><textarea class="cell-input remark" rows="2" placeholder="Remark">${escapeHtml(data.remark || '')}</textarea></td>
@@ -545,6 +561,12 @@ function addPidReportRow(data) {
 
     row.querySelectorAll('.pid-wo-qty, .pid-mnf, .pid-supp-rod').forEach((input) => {
         input.addEventListener('input', recalculatePidRows);
+    });
+
+    row.querySelector('.pid-prev').addEventListener('input', (event) => {
+        const value = event.target.value.trim();
+        row.dataset.previousPercentOverride = value === '' ? '' : String(numberValue(value));
+        updatePidCumulativePercentages();
     });
 
     row.querySelector('.remove-row').addEventListener('click', () => {
@@ -667,13 +689,18 @@ function updateCumulativePercentages() {
         const woNo = row.dataset.woNo;
         const woQty = numberValue(row.querySelector('.manual-wo-qty').value);
         const databasePreviousPercent = woQty > 0 ? (numberValue(row.dataset.previousMnfWeight) / woQty) * 100 : 0;
-        const previousPercent = row.dataset.hasDeliveryHistory === '1'
-            ? databasePreviousPercent
-            : (cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : 0);
+        const hasManualOverride = row.dataset.previousPercentOverride !== '';
+        const previousPercent = hasManualOverride
+            ? numberValue(row.dataset.previousPercentOverride)
+            : (row.dataset.hasDeliveryHistory === '1'
+                ? databasePreviousPercent
+                : (cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : 0));
         const currentPercent = numberValue(row.dataset.currentPercent);
         const totalDelivered = previousPercent + currentPercent;
 
-        row.querySelector('.manual-prev').value = formatPercent(previousPercent);
+        if (!hasManualOverride) {
+            row.querySelector('.manual-prev').value = formatRawNumber(previousPercent);
+        }
         row.querySelector('.delivered-total').textContent = formatPercent(totalDelivered);
         cumulativeByWo.set(woNo, Math.max(cumulativeByWo.get(woNo) || 0, totalDelivered));
     });
@@ -734,13 +761,18 @@ function updatePidCumulativePercentages() {
         const woNo = row.dataset.woNo;
         const woQty = numberValue(row.querySelector('.pid-wo-qty').value);
         const databasePreviousPercent = woQty > 0 ? (numberValue(row.dataset.previousPidArea) / woQty) * 100 : 0;
-        const previousPercent = row.dataset.hasDeliveryHistory === '1'
-            ? databasePreviousPercent
-            : (cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : 0);
+        const hasManualOverride = row.dataset.previousPercentOverride !== '';
+        const previousPercent = hasManualOverride
+            ? numberValue(row.dataset.previousPercentOverride)
+            : (row.dataset.hasDeliveryHistory === '1'
+                ? databasePreviousPercent
+                : (cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : 0));
         const currentPercent = numberValue(row.dataset.currentPercent);
         const totalDelivered = previousPercent + currentPercent;
 
-        row.querySelector('.pid-prev').value = formatPercent(previousPercent);
+        if (!hasManualOverride) {
+            row.querySelector('.pid-prev').value = formatRawNumber(previousPercent);
+        }
         row.querySelector('.pid-delivered-total').textContent = formatPercent(totalDelivered);
         cumulativeByWo.set(woNo, Math.max(cumulativeByWo.get(woNo) || 0, totalDelivered));
     });
