@@ -10,6 +10,7 @@ const dnPicker = document.querySelector('#dnPicker');
 const dnSelect = document.querySelector('#dnSelect');
 const addSelectedDn = document.querySelector('#addSelectedDn');
 const exportReport = document.querySelector('#exportReport');
+const exportExcel = document.querySelector('#exportExcel');
 const saveReport = document.querySelector('#saveReport');
 const autoloadDeliveryNotes = document.querySelector('#autoloadDeliveryNotes');
 const currentReportId = document.querySelector('#currentReportId');
@@ -288,6 +289,57 @@ if (exportReport) {
         }
 
         exportPdf(rows, pidReportRows);
+    });
+}
+
+if (exportExcel) {
+    exportExcel.addEventListener('click', async () => {
+        const items = collectReportItems();
+        const pidItems = collectPidItems();
+        const ancillaryItems = collectAncillaryItems();
+        if (!items.length && !pidItems.length && !ancillaryItems.length) {
+            lookupMessage.textContent = 'Add at least one row before exporting.';
+            return;
+        }
+
+        const reportDate = document.querySelector('#report_date').value;
+        const originalLabel = exportExcel.textContent;
+        exportExcel.disabled = true;
+        exportExcel.textContent = 'Exporting...';
+
+        try {
+            const response = await fetch('export_excel.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    report_date: reportDate,
+                    items,
+                    pid_items: pidItems,
+                    ancillary_items: ancillaryItems,
+                }),
+            });
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(payload.message || 'Excel export failed.');
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Delivery Report-${reportDate}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            lookupMessage.textContent = 'Excel report exported.';
+        } catch (error) {
+            lookupMessage.textContent = error.message || 'Excel export failed.';
+        } finally {
+            exportExcel.disabled = false;
+            exportExcel.textContent = originalLabel;
+        }
     });
 }
 

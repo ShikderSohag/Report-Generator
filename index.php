@@ -75,6 +75,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                 <button id="autoloadDeliveryNotes" type="button">Load Delivery Notes</button>
                 <button id="saveReport" type="button">Save Report</button>
                 <button id="exportReport" type="button">Export PDF</button>
+                <button id="exportExcel" type="button">Export Excel</button>
             </div>
 
             <form id="reportForm" class="lookup-form">
