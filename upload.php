@@ -7,20 +7,32 @@ require __DIR__ . '/pdf_reader.php';
 
 @set_time_limit(300);
 
-function redirectWith(string $key, string $value): never
+function respondWith(string $key, string $value): never
 {
+    $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+    $expectsJson = ($_POST['ajax'] ?? '') === '1' || str_contains($accept, 'application/json');
+    if ($expectsJson) {
+        http_response_code($key === 'error' ? 422 : 200);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok' => $key !== 'error',
+            'message' => $value,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
     header('Location: index.php?' . http_build_query([$key => $value]));
     exit;
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    redirectWith('error', 'Invalid upload request.');
+    respondWith('error', 'Invalid upload request.');
 }
 
 $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
 $postMaxBytes = iniSizeToBytes((string) ini_get('post_max_size'));
 if ($contentLength > 0 && $postMaxBytes > 0 && $contentLength > $postMaxBytes && empty($_FILES)) {
-    redirectWith(
+    respondWith(
         'error',
         'The upload is larger than the server POST limit (' . ini_get('post_max_size') . '). '
         . 'Wait a few minutes after deploying .user.ini, then try again.'
@@ -35,7 +47,7 @@ if (!is_dir($uploadDir)) {
 try {
     $files = uploadedFiles('excel_file');
     if (!$files) {
-        redirectWith('error', 'Please choose at least one valid source file.');
+        respondWith('error', 'Please choose at least one valid source file.');
     }
 
     $summary = [
@@ -60,7 +72,7 @@ try {
     }
 
     if ($summary['failed'] > 0 && $summary['inserted'] === 0 && $summary['skipped'] === 0) {
-        redirectWith('error', 'Import failed: ' . implode(' | ', $summary['errors']));
+        respondWith('error', 'Import failed: ' . implode(' | ', $summary['errors']));
     }
 
     $message = "Import completed. Files {$summary['files']}, inserted {$summary['inserted']} new row(s), skipped/updated {$summary['skipped']} existing/invalid row(s)";
@@ -68,12 +80,12 @@ try {
         $message .= ", failed {$summary['failed']} file(s): " . implode(' | ', $summary['errors']);
     }
 
-    redirectWith(
+    respondWith(
         'message',
         $message . '.'
     );
 } catch (Throwable $exception) {
-    redirectWith('error', 'Import failed: ' . $exception->getMessage());
+    respondWith('error', 'Import failed: ' . $exception->getMessage());
 }
 
 function uploadedFiles(string $field): array

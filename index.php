@@ -45,7 +45,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                 <p>Upload Excel/CSV work orders, delivery-note PDFs, or ZIP files containing them.</p>
             </div>
 
-            <form class="upload-form" action="upload.php" method="post" enctype="multipart/form-data">
+            <form id="uploadForm" class="upload-form" action="upload.php" method="post" enctype="multipart/form-data">
                 <label class="drop-zone" for="excel_file">
                     <input id="excel_file" name="excel_file[]" type="file" accept=".xlsx,.csv,.pdf,.zip" multiple required>
                     <span class="drop-title">Drop Excel, CSV, PDF, or ZIP files here</span>
@@ -53,6 +53,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                     <span id="fileName" class="file-name"></span>
                 </label>
                 <button type="submit">Upload and Import</button>
+                <div id="uploadResult" class="notice" role="status" aria-live="polite" hidden></div>
             </form>
         </section>
 

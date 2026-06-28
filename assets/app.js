@@ -1,6 +1,8 @@
 const fileInput = document.querySelector('#excel_file');
 const fileName = document.querySelector('#fileName');
 const dropZone = document.querySelector('.drop-zone');
+const uploadForm = document.querySelector('#uploadForm');
+const uploadResult = document.querySelector('#uploadResult');
 const reportForm = document.querySelector('#reportForm');
 const lookupMessage = document.querySelector('#lookupMessage');
 const reportRows = document.querySelector('#reportRows');
@@ -57,6 +59,64 @@ if (fileInput && fileName && dropZone) {
 
         fileInput.files = files;
         fileName.textContent = selectedFileLabel(files);
+    });
+}
+
+if (uploadForm && fileInput && fileName && uploadResult) {
+    uploadForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const files = Array.from(fileInput.files);
+        if (!files.length) {
+            return;
+        }
+
+        const submitButton = uploadForm.querySelector('button[type="submit"]');
+        const failures = [];
+        let completed = 0;
+
+        submitButton.disabled = true;
+        uploadResult.hidden = false;
+        uploadResult.className = 'notice';
+
+        for (let index = 0; index < files.length; index += 1) {
+            const file = files[index];
+            fileName.textContent = `Uploading ${index + 1}/${files.length}: ${file.name}`;
+            uploadResult.textContent = `Importing ${file.name}...`;
+
+            try {
+                const formData = new FormData();
+                formData.append('ajax', '1');
+                formData.append('excel_file[]', file, file.name);
+
+                const response = await fetch(uploadForm.action, {
+                    method: 'POST',
+                    headers: { Accept: 'application/json' },
+                    body: formData,
+                });
+                const result = await response.json();
+
+                if (!response.ok || !result.ok) {
+                    throw new Error(result.message || 'Upload failed.');
+                }
+
+                completed += 1;
+            } catch (error) {
+                failures.push(`${file.name}: ${error.message || 'Upload failed.'}`);
+            }
+        }
+
+        submitButton.disabled = false;
+        fileInput.value = '';
+        fileName.textContent = '';
+
+        if (failures.length) {
+            uploadResult.className = 'notice error';
+            uploadResult.textContent = `Completed ${completed} of ${files.length} file(s). Failed: ${failures.join(' | ')}`;
+        } else {
+            uploadResult.className = 'notice success';
+            uploadResult.textContent = `Import completed for all ${completed} file(s).`;
+        }
     });
 }
 
