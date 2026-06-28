@@ -445,7 +445,7 @@ function addReportRow(data) {
         <td class="shipment-total">0 KGs</td>
         <td class="mnf-qty">${formatPcs(data.wo_qty)}</td>
         <td class="shipment-percent">0%</td>
-        <td><input class="cell-input number manual-prev" type="number" min="0" step="0.01" value="${hasPreviousPercentOverride ? formatRawNumber(data.previous_delivered_percent) : '0'}"></td>
+        <td><div class="percent-input"><input class="cell-input number manual-prev" type="number" min="0" step="1" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
         <td class="delivered-total">0%</td>
         <td><textarea class="cell-input remark" rows="2" placeholder="Remark">${escapeHtml(data.remark || '')}</textarea></td>
         <td><button class="remove-row" type="button">Remove</button></td>
@@ -461,10 +461,14 @@ function addReportRow(data) {
         });
     });
 
-    row.querySelector('.manual-prev').addEventListener('input', (event) => {
+    const previousPercentInput = row.querySelector('.manual-prev');
+    previousPercentInput.addEventListener('input', (event) => {
         const value = event.target.value.trim();
         row.dataset.previousPercentOverride = value === '' ? '' : String(numberValue(value));
         updateCumulativePercentages();
+    });
+    previousPercentInput.addEventListener('change', () => {
+        roundPreviousPercentInput(row, previousPercentInput, updateCumulativePercentages);
     });
 
     row.querySelector('.remove-row').addEventListener('click', () => {
@@ -552,7 +556,7 @@ function addPidReportRow(data) {
         <td class="pid-shipment-total">0 m²</td>
         <td class="pid-mnf-qty">${formatPcs(mnfQty)}</td>
         <td class="pid-shipment-percent">0%</td>
-        <td><input class="cell-input number pid-prev" type="number" min="0" step="0.01" value="${hasPreviousPercentOverride ? formatRawNumber(data.previous_delivered_percent) : '0'}"></td>
+        <td><div class="percent-input"><input class="cell-input number pid-prev" type="number" min="0" step="1" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
         <td class="pid-delivered-total">0%</td>
         <td><input class="cell-input short" type="text" placeholder="Material" value="${escapeHtml(data.pid_material || data.material || '')}"></td>
         <td><textarea class="cell-input remark" rows="2" placeholder="Remark">${escapeHtml(data.remark || '')}</textarea></td>
@@ -563,10 +567,14 @@ function addPidReportRow(data) {
         input.addEventListener('input', recalculatePidRows);
     });
 
-    row.querySelector('.pid-prev').addEventListener('input', (event) => {
+    const previousPercentInput = row.querySelector('.pid-prev');
+    previousPercentInput.addEventListener('input', (event) => {
         const value = event.target.value.trim();
         row.dataset.previousPercentOverride = value === '' ? '' : String(numberValue(value));
         updatePidCumulativePercentages();
+    });
+    previousPercentInput.addEventListener('change', () => {
+        roundPreviousPercentInput(row, previousPercentInput, updatePidCumulativePercentages);
     });
 
     row.querySelector('.remove-row').addEventListener('click', () => {
@@ -690,16 +698,16 @@ function updateCumulativePercentages() {
         const woQty = numberValue(row.querySelector('.manual-wo-qty').value);
         const databasePreviousPercent = woQty > 0 ? (numberValue(row.dataset.previousMnfWeight) / woQty) * 100 : 0;
         const hasManualOverride = row.dataset.previousPercentOverride !== '';
-        const previousPercent = hasManualOverride
+        const previousPercent = roundedPercent(hasManualOverride
             ? numberValue(row.dataset.previousPercentOverride)
             : (row.dataset.hasDeliveryHistory === '1'
                 ? databasePreviousPercent
-                : (cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : 0));
+                : (cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : 0)));
         const currentPercent = numberValue(row.dataset.currentPercent);
         const totalDelivered = previousPercent + currentPercent;
 
         if (!hasManualOverride) {
-            row.querySelector('.manual-prev').value = formatRawNumber(previousPercent);
+            row.querySelector('.manual-prev').value = previousPercent;
         }
         row.querySelector('.delivered-total').textContent = formatPercent(totalDelivered);
         cumulativeByWo.set(woNo, Math.max(cumulativeByWo.get(woNo) || 0, totalDelivered));
@@ -762,16 +770,16 @@ function updatePidCumulativePercentages() {
         const woQty = numberValue(row.querySelector('.pid-wo-qty').value);
         const databasePreviousPercent = woQty > 0 ? (numberValue(row.dataset.previousPidArea) / woQty) * 100 : 0;
         const hasManualOverride = row.dataset.previousPercentOverride !== '';
-        const previousPercent = hasManualOverride
+        const previousPercent = roundedPercent(hasManualOverride
             ? numberValue(row.dataset.previousPercentOverride)
             : (row.dataset.hasDeliveryHistory === '1'
                 ? databasePreviousPercent
-                : (cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : 0));
+                : (cumulativeByWo.has(woNo) ? cumulativeByWo.get(woNo) : 0)));
         const currentPercent = numberValue(row.dataset.currentPercent);
         const totalDelivered = previousPercent + currentPercent;
 
         if (!hasManualOverride) {
-            row.querySelector('.pid-prev').value = formatRawNumber(previousPercent);
+            row.querySelector('.pid-prev').value = previousPercent;
         }
         row.querySelector('.pid-delivered-total').textContent = formatPercent(totalDelivered);
         cumulativeByWo.set(woNo, Math.max(cumulativeByWo.get(woNo) || 0, totalDelivered));
@@ -1519,8 +1527,22 @@ function formatMeters(value) {
 }
 
 function formatPercent(value) {
-    const percent = numberValue(value);
-    return `${Math.round(percent)}%`;
+    return `${roundedPercent(value)}%`;
+}
+
+function roundedPercent(value) {
+    return Math.round(numberValue(value));
+}
+
+function roundPreviousPercentInput(row, input, recalculate) {
+    if (input.value.trim() === '') {
+        row.dataset.previousPercentOverride = '';
+    } else {
+        const rounded = roundedPercent(input.value);
+        input.value = rounded;
+        row.dataset.previousPercentOverride = String(rounded);
+    }
+    recalculate();
 }
 
 function formatPcs(value) {

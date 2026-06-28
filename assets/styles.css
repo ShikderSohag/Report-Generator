@@ -473,6 +473,27 @@ input[readonly] {
     text-align: right;
 }
 
+.percent-input {
+    align-items: center;
+    display: flex;
+    position: relative;
+    width: 100%;
+}
+
+.percent-input::after {
+    content: '%';
+    font-size: 7px;
+    font-weight: 700;
+    pointer-events: none;
+    position: absolute;
+    right: 4px;
+}
+
+.report-table .percent-input .cell-input {
+    padding-right: 12px;
+    width: 100%;
+}
+
 .report-table .cell-input.number::-webkit-inner-spin-button,
 .report-table .cell-input.number::-webkit-outer-spin-button {
     opacity: 0;
