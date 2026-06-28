@@ -1131,7 +1131,7 @@ function exportPdf(rows, pidReportRows) {
     const bodyRows = renderMergedExportRows(data, [1, 2, 3, 4], [0, 1, 2, 3, 4]);
     const metalSection = rows.length ? `
             <div class="title">Duct &amp; Fittings - Daily Delivery Report</div>
-            <div class="meta">
+            <div class="meta metal-meta">
                 <span>Duct &amp; Fittings Delivered WOs (Metal Ducts)</span>
                 <span>Report Date: ${escapeHtml(reportDate)}</span>
             </div>
@@ -1356,6 +1356,18 @@ function exportPdf(rows, pidReportRows) {
                     font-weight: 700;
                     justify-content: space-between;
                     padding: 5px 8px;
+                }
+                .metal-meta {
+                    display: grid;
+                    grid-template-columns: 1fr auto 1fr;
+                }
+                .metal-meta span:first-child {
+                    grid-column: 2;
+                    text-align: center;
+                }
+                .metal-meta span:last-child {
+                    grid-column: 3;
+                    justify-self: end;
                 }
                 .pid-meta { margin-top: 8px; }
                 table { border-collapse: collapse; table-layout: fixed; width: 100%; }
