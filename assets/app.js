@@ -423,9 +423,8 @@ function addReportRow(data) {
     row.dataset.previousPercentOverride = hasPreviousPercentOverride
         ? String(numberValue(data.previous_delivered_percent))
         : '';
-    row.draggable = true;
     row.innerHTML = `
-        <td class="serial drag-handle" title="Drag to reorder"></td>
+        <td class="serial drag-handle" draggable="true" title="Drag to reorder"></td>
         <td>
             <div class="main-value">${escapeHtml(data.customer_name || '')}</div>
         </td>
@@ -479,11 +478,14 @@ function addReportRow(data) {
         recalculateAllRows();
     });
 
-    row.addEventListener('dragstart', () => {
+    const dragHandle = row.querySelector('.drag-handle');
+    dragHandle.addEventListener('dragstart', (event) => {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', row.dataset.rowKey);
         row.classList.add('dragging-row');
     });
 
-    row.addEventListener('dragend', () => {
+    dragHandle.addEventListener('dragend', () => {
         row.classList.remove('dragging-row');
         refreshSerialNumbers();
         recalculateAllRows();
