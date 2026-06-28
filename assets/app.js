@@ -31,9 +31,11 @@ const addAncillaryRow = document.querySelector('#addAncillaryRow');
 const ancillaryRows = document.querySelector('#ancillaryRows');
 const addedWorkOrders = new Set();
 let pendingLookup = null;
+let droppedUploadFiles = null;
 
 if (fileInput && fileName && dropZone) {
     fileInput.addEventListener('change', () => {
+        droppedUploadFiles = null;
         fileName.textContent = fileInput.files.length ? selectedFileLabel(fileInput.files) : '';
     });
 
@@ -51,13 +53,19 @@ if (fileInput && fileName && dropZone) {
         });
     });
 
-    dropZone.addEventListener('drop', (event) => {
-        const files = event.dataTransfer.files;
+    dropZone.addEventListener('drop', async (event) => {
+        fileName.textContent = 'Scanning dropped folder...';
+        const discoveredFiles = await filesFromDrop(event.dataTransfer);
+        const files = requiredUploadFiles(discoveredFiles);
+
         if (!files.length) {
+            droppedUploadFiles = null;
+            fileName.textContent = 'No supported delivery-note or work-order files found.';
             return;
         }
 
-        fileInput.files = files;
+        fileInput.value = '';
+        droppedUploadFiles = files;
         fileName.textContent = selectedFileLabel(files);
     });
 }
@@ -66,7 +74,7 @@ if (uploadForm && fileInput && fileName && uploadResult) {
     uploadForm.addEventListener('submit', async (event) => {
         event.preventDefault();
 
-        const files = Array.from(fileInput.files);
+        const files = droppedUploadFiles || Array.from(fileInput.files);
         if (!files.length) {
             return;
         }
@@ -108,6 +116,7 @@ if (uploadForm && fileInput && fileName && uploadResult) {
 
         submitButton.disabled = false;
         fileInput.value = '';
+        droppedUploadFiles = null;
         fileName.textContent = '';
 
         if (failures.length) {
@@ -126,6 +135,72 @@ function selectedFileLabel(files) {
     }
 
     return `${files.length} files selected`;
+}
+
+async function filesFromDrop(dataTransfer) {
+    const items = Array.from(dataTransfer.items || []);
+    const entries = items
+        .map((item) => (typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null))
+        .filter(Boolean);
+
+    if (!entries.length) {
+        return Array.from(dataTransfer.files || []);
+    }
+
+    const nestedFiles = await Promise.all(entries.map((entry) => filesFromEntry(entry)));
+    return nestedFiles.flat();
+}
+
+async function filesFromEntry(entry) {
+    if (entry.isFile) {
+        return new Promise((resolve) => {
+            entry.file((file) => resolve([file]), () => resolve([]));
+        });
+    }
+
+    if (!entry.isDirectory) {
+        return [];
+    }
+
+    const reader = entry.createReader();
+    const entries = [];
+
+    while (true) {
+        const batch = await new Promise((resolve) => reader.readEntries(resolve, () => resolve([])));
+        if (!batch.length) {
+            break;
+        }
+        entries.push(...batch);
+    }
+
+    const nestedFiles = await Promise.all(entries.map((child) => filesFromEntry(child)));
+    return nestedFiles.flat();
+}
+
+function requiredUploadFiles(files) {
+    const supported = files.filter((file) => {
+        const name = file.name.toLowerCase();
+        return /\.(xlsx|csv|pdf|zip)$/.test(name) || /^\d{8,}$/.test(name);
+    });
+    const deliveryNotePdfs = supported.filter((file) => {
+        return file.name.toLowerCase().endsWith('.pdf') && isDeliveryNoteFileName(file.name);
+    });
+
+    if (!deliveryNotePdfs.length) {
+        return supported;
+    }
+
+    return supported.filter((file) => {
+        return !file.name.toLowerCase().endsWith('.pdf') || isDeliveryNoteFileName(file.name);
+    });
+}
+
+function isDeliveryNoteFileName(fileName) {
+    const normalized = fileName
+        .replace(/\.[^.]+$/, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ');
+    return /\b(mnf|manufactured|fix|fixed|anc|ancillary|ancillaries)\b/.test(normalized);
 }
 
 if (reportForm) {
