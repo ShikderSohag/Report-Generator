@@ -5,6 +5,8 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/xlsx_reader.php';
 require __DIR__ . '/pdf_reader.php';
 
+@set_time_limit(300);
+
 function redirectWith(string $key, string $value): never
 {
     header('Location: index.php?' . http_build_query([$key => $value]));
@@ -13,6 +15,16 @@ function redirectWith(string $key, string $value): never
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     redirectWith('error', 'Invalid upload request.');
+}
+
+$contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+$postMaxBytes = iniSizeToBytes((string) ini_get('post_max_size'));
+if ($contentLength > 0 && $postMaxBytes > 0 && $contentLength > $postMaxBytes && empty($_FILES)) {
+    redirectWith(
+        'error',
+        'The upload is larger than the server POST limit (' . ini_get('post_max_size') . '). '
+        . 'Wait a few minutes after deploying .user.ini, then try again.'
+    );
 }
 
 $uploadDir = __DIR__ . '/uploads';
@@ -101,17 +113,20 @@ function uploadedFiles(string $field): array
 function importUploadedFile(array $file, string $uploadDir): array
 {
     if ($file['error'] !== UPLOAD_ERR_OK) {
-        throw new RuntimeException('Upload failed with error code ' . $file['error']);
+        throw new RuntimeException(uploadErrorMessage((int) $file['error']));
     }
 
     $originalName = $file['name'];
-    $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+    $extension = detectUploadExtension($file);
 
     if (!in_array($extension, ['xlsx', 'csv', 'pdf', 'zip'], true)) {
-        throw new RuntimeException('Only .xlsx, .csv, .pdf, and .zip files are supported.');
+        throw new RuntimeException('The file type could not be recognized. Upload an Excel, CSV, PDF, or ZIP file.');
     }
 
     $safeName = preg_replace('/[^A-Za-z0-9_.-]/', '_', $originalName);
+    if (strtolower(pathinfo($safeName, PATHINFO_EXTENSION)) !== $extension) {
+        $safeName .= '.' . $extension;
+    }
     $targetPath = $uploadDir . '/' . date('Ymd_His') . '_' . uniqid('', true) . '_' . $safeName;
 
     if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
@@ -128,6 +143,81 @@ function importUploadedFile(array $file, string $uploadDir): array
 
     $rows = $extension === 'csv' ? readCsvRows($targetPath) : readXlsxRows($targetPath);
     return importRows($rows);
+}
+
+function uploadErrorMessage(int $error): string
+{
+    return match ($error) {
+        UPLOAD_ERR_INI_SIZE => 'The file exceeds the server upload limit (' . ini_get('upload_max_filesize') . ').',
+        UPLOAD_ERR_FORM_SIZE => 'The file exceeds the upload limit allowed by the form.',
+        UPLOAD_ERR_PARTIAL => 'Only part of the file reached the server. Please retry the file; if it repeats, upload it by itself and check the connection.',
+        UPLOAD_ERR_NO_FILE => 'No file was received.',
+        UPLOAD_ERR_NO_TMP_DIR => 'The server upload temporary folder is missing. Ask the hosting provider to restore the PHP temporary directory.',
+        UPLOAD_ERR_CANT_WRITE => 'The server could not write the upload to disk. Check hosting disk space and temporary-folder permissions.',
+        UPLOAD_ERR_EXTENSION => 'A server PHP extension stopped the upload. Check cPanel or ModSecurity logs.',
+        default => 'The upload failed with PHP error code ' . $error . '.',
+    };
+}
+
+function detectUploadExtension(array $file): string
+{
+    $extension = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
+    if (in_array($extension, ['xlsx', 'csv', 'pdf', 'zip'], true)) {
+        return $extension;
+    }
+
+    $path = (string) ($file['tmp_name'] ?? '');
+    if ($path === '' || !is_file($path)) {
+        return '';
+    }
+
+    $stream = fopen($path, 'rb');
+    $signature = $stream ? (string) fread($stream, 8) : '';
+    if ($stream) {
+        fclose($stream);
+    }
+
+    if (str_starts_with($signature, '%PDF-')) {
+        return 'pdf';
+    }
+
+    if (str_starts_with($signature, "PK\x03\x04")) {
+        $zip = new ZipArchive();
+        if ($zip->open($path) === true) {
+            $isWorkbook = $zip->locateName('xl/workbook.xml') !== false;
+            $zip->close();
+            return $isWorkbook ? 'xlsx' : 'zip';
+        }
+    }
+
+    if (function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $finfo ? finfo_file($finfo, $path) : false;
+        if ($finfo) {
+            finfo_close($finfo);
+        }
+        if (in_array($mime, ['text/csv', 'text/plain', 'application/csv'], true)) {
+            return 'csv';
+        }
+    }
+
+    return '';
+}
+
+function iniSizeToBytes(string $value): int
+{
+    $value = trim($value);
+    if ($value === '') {
+        return 0;
+    }
+
+    $number = (float) $value;
+    return match (strtolower(substr($value, -1))) {
+        'g' => (int) ($number * 1024 * 1024 * 1024),
+        'm' => (int) ($number * 1024 * 1024),
+        'k' => (int) ($number * 1024),
+        default => (int) $number,
+    };
 }
 
 function importZip(string $path, string $uploadDir): array
