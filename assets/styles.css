@@ -469,6 +469,7 @@ input[readonly] {
 }
 
 .report-table .cell-input.number {
+    appearance: textfield;
     min-width: 0;
     text-align: right;
 }
@@ -496,14 +497,8 @@ input[readonly] {
 
 .report-table .cell-input.number::-webkit-inner-spin-button,
 .report-table .cell-input.number::-webkit-outer-spin-button {
-    opacity: 0;
-}
-
-.report-table .cell-input.number:hover::-webkit-inner-spin-button,
-.report-table .cell-input.number:focus::-webkit-inner-spin-button,
-.report-table .cell-input.number:hover::-webkit-outer-spin-button,
-.report-table .cell-input.number:focus::-webkit-outer-spin-button {
-    opacity: 1;
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .report-table .cell-input.remark {

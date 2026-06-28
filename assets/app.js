@@ -440,12 +440,12 @@ function addReportRow(data) {
             </select>
         </td>
         <td><input class="cell-input number manual-wo-qty" type="text" inputmode="decimal" value="${formatRawNumber(row.dataset.woQty)}"></td>
-        <td><input class="cell-input number manual-mnf" type="number" min="0" step="0.01" value="${formatRawNumber(mnfWeight)}"></td>
-        <td><input class="cell-input number manual-fix" type="number" min="0" step="0.01" value="${formatRawNumber(fixAncWeight)}"></td>
+        <td><input class="cell-input number manual-mnf" type="text" inputmode="decimal" value="${formatRawNumber(mnfWeight)}"></td>
+        <td><input class="cell-input number manual-fix" type="text" inputmode="decimal" value="${formatRawNumber(fixAncWeight)}"></td>
         <td class="shipment-total">0 KGs</td>
         <td class="mnf-qty">${formatPcs(data.wo_qty)}</td>
         <td class="shipment-percent">0%</td>
-        <td><div class="percent-input"><input class="cell-input number manual-prev" type="number" min="0" step="1" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
+        <td><div class="percent-input"><input class="cell-input number manual-prev" type="text" inputmode="decimal" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
         <td class="delivered-total">0%</td>
         <td><textarea class="cell-input remark" rows="2" placeholder="Remark">${escapeHtml(data.remark || '')}</textarea></td>
         <td><button class="remove-row" type="button">Remove</button></td>
@@ -556,7 +556,7 @@ function addPidReportRow(data) {
         <td class="pid-shipment-total">0 m²</td>
         <td class="pid-mnf-qty">${formatPcs(mnfQty)}</td>
         <td class="pid-shipment-percent">0%</td>
-        <td><div class="percent-input"><input class="cell-input number pid-prev" type="number" min="0" step="1" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
+        <td><div class="percent-input"><input class="cell-input number pid-prev" type="text" inputmode="decimal" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
         <td class="pid-delivered-total">0%</td>
         <td><input class="cell-input short" type="text" placeholder="Material" value="${escapeHtml(data.pid_material || data.material || '')}"></td>
         <td><textarea class="cell-input remark" rows="2" placeholder="Remark">${escapeHtml(data.remark || '')}</textarea></td>
