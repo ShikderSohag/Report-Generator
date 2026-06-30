@@ -73,6 +73,8 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
             <div class="report-actions">
                 <input id="currentReportId" type="hidden" value="">
                 <button id="autoloadDeliveryNotes" type="button">Load Delivery Notes</button>
+                <button id="addManualMetalRow" type="button">Add Manual Metal Row</button>
+                <button id="addManualPidRow" type="button">Add Manual PID Row</button>
                 <button id="saveReport" type="button">Save Report</button>
                 <button id="exportReport" type="button">Export PDF</button>
                 <button id="exportExcel" type="button">Export Excel</button>

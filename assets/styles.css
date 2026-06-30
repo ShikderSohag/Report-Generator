@@ -76,6 +76,7 @@ nav a {
 
 .report-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 10px;
     justify-content: flex-end;
     margin-bottom: 14px;

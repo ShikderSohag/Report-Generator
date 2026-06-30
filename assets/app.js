@@ -28,11 +28,14 @@ const pidTotalMnf = document.querySelector('#pidTotalMnf');
 const pidTotalSuppRod = document.querySelector('#pidTotalSuppRod');
 const pidTotalShipment = document.querySelector('#pidTotalShipment');
 const pidTotalMnfQty = document.querySelector('#pidTotalMnfQty');
+const addManualMetalRow = document.querySelector('#addManualMetalRow');
+const addManualPidRow = document.querySelector('#addManualPidRow');
 const addAncillaryRow = document.querySelector('#addAncillaryRow');
 const ancillaryRows = document.querySelector('#ancillaryRows');
 const addedWorkOrders = new Set();
 let pendingLookup = null;
 let droppedUploadFiles = null;
+let manualRowSequence = 0;
 
 if (fileInput && fileName && dropZone) {
     fileInput.addEventListener('change', () => {
@@ -273,6 +276,20 @@ if (addAncillaryRow) {
     });
 }
 
+if (addManualMetalRow) {
+    addManualMetalRow.addEventListener('click', () => {
+        const row = addReportRow(createManualRowData('metal'));
+        focusManualRow(row);
+    });
+}
+
+if (addManualPidRow) {
+    addManualPidRow.addEventListener('click', () => {
+        const row = addPidReportRow(createManualRowData('pid'));
+        focusManualRow(row);
+    });
+}
+
 if (autoloadDeliveryNotes) {
     autoloadDeliveryNotes.addEventListener('click', () => {
         loadDeliveryNotesForReportDate(false);
@@ -466,7 +483,7 @@ function addReportRow(data) {
     const fixAncWeight = numberValue(data.fix_anc_weight);
     const hasPreviousPercentOverride = data.previous_delivered_percent !== undefined
         && data.previous_delivered_percent !== null;
-    row.dataset.woNo = normalizedWoNo;
+    row.dataset.woNo = normalizedWoNo || rowKey;
     row.dataset.rowKey = rowKey;
     row.dataset.woQty = numberValue(data.duct_weight);
     row.dataset.mnfQty = numberValue(data.wo_qty);
@@ -477,11 +494,9 @@ function addReportRow(data) {
         : '';
     row.innerHTML = `
         <td class="serial drag-handle" draggable="true" title="Drag to reorder"></td>
-        <td>
-            <div class="main-value">${escapeHtml(data.customer_name || '')}</div>
-        </td>
+        <td><input class="cell-input customer-input" type="text" placeholder="Customer" value="${escapeHtml(data.customer_name || '')}"></td>
         <td><input class="cell-input" type="text" placeholder="Project" value="${escapeHtml(data.project_name || '')}"></td>
-        <td><input class="cell-input short" type="text" placeholder="Delivery Note" value="${escapeHtml(data.wo_no || data.delivery_note || '')}"></td>
+        <td><input class="cell-input short delivery-note-input" type="text" placeholder="Delivery Note" value="${escapeHtml(data.wo_no || data.delivery_note || '')}"></td>
         <td><input class="cell-input short" type="text" placeholder="DN" value="${escapeHtml(data.dn_number || '')}"></td>
         <td><input class="cell-input" type="text" placeholder="Destination" value="${escapeHtml(data.destination || '')}"></td>
         <td>
@@ -494,7 +509,7 @@ function addReportRow(data) {
         <td><input class="cell-input number manual-mnf" type="text" inputmode="decimal" value="${formatRawNumber(mnfWeight)}"></td>
         <td><input class="cell-input number manual-fix" type="text" inputmode="decimal" value="${formatRawNumber(fixAncWeight)}"></td>
         <td class="shipment-total">0 KGs</td>
-        <td class="mnf-qty">${formatPcs(data.wo_qty)}</td>
+        <td><input class="cell-input number manual-mnf-qty" type="text" inputmode="decimal" value="${formatRawNumber(data.wo_qty || 0)}"></td>
         <td class="shipment-percent">0%</td>
         <td><div class="percent-input"><input class="cell-input number manual-prev" type="text" inputmode="decimal" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
         <td class="delivered-total">0%</td>
@@ -502,14 +517,22 @@ function addReportRow(data) {
         <td><button class="remove-row" type="button">Remove</button></td>
     `;
 
-    row.querySelectorAll('.manual-wo-qty, .manual-mnf, .manual-fix').forEach((input) => {
+    row.querySelectorAll('.manual-wo-qty, .manual-mnf, .manual-fix, .manual-mnf-qty').forEach((input) => {
         input.addEventListener('input', () => {
             if (input.classList.contains('manual-wo-qty')) {
                 syncWoQtyAcrossRows(row);
+            } else if (input.classList.contains('manual-mnf-qty')) {
+                row.dataset.mnfQty = numberValue(input.value);
+                updateGrandTotals();
             } else {
                 recalculateAllRows();
             }
         });
+    });
+
+    row.querySelector('.delivery-note-input').addEventListener('input', (event) => {
+        row.dataset.woNo = event.target.value.trim().toUpperCase() || row.dataset.rowKey;
+        updateCumulativePercentages();
     });
 
     const previousPercentInput = row.querySelector('.manual-prev');
@@ -558,6 +581,7 @@ function addReportRow(data) {
     reportRows.appendChild(row);
     refreshSerialNumbers();
     recalculateAllRows();
+    return row;
 }
 
 function addPidReportRow(data) {
@@ -581,7 +605,7 @@ function addPidReportRow(data) {
     const hasPreviousPercentOverride = data.previous_delivered_percent !== undefined
         && data.previous_delivered_percent !== null;
 
-    row.dataset.woNo = normalizedWoNo;
+    row.dataset.woNo = normalizedWoNo || rowKey;
     row.dataset.rowKey = rowKey;
     row.dataset.woQty = woQty;
     row.dataset.mnfQty = mnfQty;
@@ -592,11 +616,9 @@ function addPidReportRow(data) {
         : '';
     row.innerHTML = `
         <td class="pid-serial"></td>
-        <td>
-            <div class="main-value">${escapeHtml(data.customer_name || '')}</div>
-        </td>
+        <td><input class="cell-input customer-input" type="text" placeholder="Customer" value="${escapeHtml(data.customer_name || '')}"></td>
         <td><input class="cell-input" type="text" placeholder="Project" value="${escapeHtml(data.project_name || '')}"></td>
-        <td><input class="cell-input short" type="text" placeholder="Delivery Note" value="${escapeHtml(data.wo_no || data.delivery_note || '')}"></td>
+        <td><input class="cell-input short delivery-note-input" type="text" placeholder="Delivery Note" value="${escapeHtml(data.wo_no || data.delivery_note || '')}"></td>
         <td><input class="cell-input short" type="text" placeholder="DN" value="${escapeHtml(data.dn_number || '')}"></td>
         <td>
             <select class="cell-input short">
@@ -608,7 +630,7 @@ function addPidReportRow(data) {
         <td><input class="cell-input number pid-mnf" type="number" min="0" step="0.01" value="${formatRawNumber(mnfArea)}"></td>
         <td><input class="cell-input number pid-supp-rod" type="number" min="0" step="0.01" value="${formatRawNumber(suppRod)}"></td>
         <td class="pid-shipment-total">0 m²</td>
-        <td class="pid-mnf-qty">${formatPcs(mnfQty)}</td>
+        <td><input class="cell-input number pid-mnf-qty-input" type="text" inputmode="decimal" value="${formatRawNumber(mnfQty)}"></td>
         <td class="pid-shipment-percent">0%</td>
         <td><div class="percent-input"><input class="cell-input number pid-prev" type="text" inputmode="decimal" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
         <td class="pid-delivered-total">0%</td>
@@ -617,8 +639,18 @@ function addPidReportRow(data) {
         <td><button class="remove-row" type="button">Remove</button></td>
     `;
 
-    row.querySelectorAll('.pid-wo-qty, .pid-mnf, .pid-supp-rod').forEach((input) => {
-        input.addEventListener('input', recalculatePidRows);
+    row.querySelectorAll('.pid-wo-qty, .pid-mnf, .pid-supp-rod, .pid-mnf-qty-input').forEach((input) => {
+        input.addEventListener('input', () => {
+            if (input.classList.contains('pid-mnf-qty-input')) {
+                row.dataset.mnfQty = numberValue(input.value);
+            }
+            recalculatePidRows();
+        });
+    });
+
+    row.querySelector('.delivery-note-input').addEventListener('input', (event) => {
+        row.dataset.woNo = event.target.value.trim().toUpperCase() || row.dataset.rowKey;
+        updatePidCumulativePercentages();
     });
 
     const previousPercentInput = row.querySelector('.pid-prev');
@@ -642,6 +674,21 @@ function addPidReportRow(data) {
     pidRows.appendChild(row);
     refreshPidSerialNumbers();
     recalculatePidRows();
+    return row;
+}
+
+function createManualRowData(ductSystem) {
+    manualRowSequence += 1;
+    return {
+        row_key: `manual-${ductSystem}-${Date.now()}-${manualRowSequence}`,
+        duct_system: ductSystem,
+        added_to_delivery: 'Yes',
+    };
+}
+
+function focusManualRow(row) {
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.querySelector('.customer-input')?.focus({ preventScroll: true });
 }
 
 function showDnPicker(baseData, deliveries) {
@@ -695,6 +742,9 @@ function mergeDelivery(baseData, delivery) {
 }
 
 function reportRowKey(data) {
+    if (data.row_key) {
+        return String(data.row_key);
+    }
     return `${(data.wo_no || data.delivery_note || '').toUpperCase()}|${(data.dn_number || '').toUpperCase()}`;
 }
 
@@ -1165,7 +1215,7 @@ function exportPdf(rows, pidReportRows) {
         formatKg(cellValue(row, 8)),
         formatKg(cellValue(row, 9)),
         formatKg(cellValue(row, 10)),
-        cellValue(row, 11),
+        formatPcs(cellValue(row, 11)),
         cellValue(row, 12),
         cellValue(row, 13),
         cellValue(row, 14),
@@ -1244,7 +1294,7 @@ function exportPdf(rows, pidReportRows) {
         formatSquareMeters(cellValue(row, 7)),
         formatMeters(cellValue(row, 8)),
         formatSquareMeters(cellValue(row, 9)),
-        cellValue(row, 10),
+        formatPcs(cellValue(row, 10)),
         cellValue(row, 11),
         cellValue(row, 12),
         cellValue(row, 13),
