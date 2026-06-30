@@ -339,6 +339,10 @@ input[readonly] {
     width: 6%;
 }
 
+.col-vehicle {
+    width: 6%;
+}
+
 .col-added {
     width: 6%;
 }

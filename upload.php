@@ -602,6 +602,22 @@ function upsertDelivery(PDO $pdo, string $woNo, array $raw): void
         $dnNumber = 'D1';
     }
 
+    $existingRawStatement = $pdo->prepare('
+        SELECT raw_data
+        FROM work_order_deliveries
+        WHERE wo_no = ? AND dn_number = ?
+        LIMIT 1
+    ');
+    $existingRawStatement->execute([$woNo, $dnNumber]);
+    $existingRaw = json_decode((string) ($existingRawStatement->fetchColumn() ?: ''), true);
+    $existingRaw = is_array($existingRaw) ? $existingRaw : [];
+    foreach ($raw as $key => $value) {
+        if ($value !== null && $value !== '') {
+            $existingRaw[$key] = $value;
+        }
+    }
+    $raw = $existingRaw;
+
     $insert = $pdo->prepare('
         INSERT INTO work_order_deliveries
             (wo_no, dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date,

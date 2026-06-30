@@ -96,6 +96,55 @@ def parse_fixed_ancillary_weight(text):
     return total_weight or None
 
 
+def parse_vehicle_type(text):
+    value = first_match(
+        r"^(?:Vehicle\s+Type|Truck\s+Type|Vehicle)\s*:\s*(.+)$",
+        text,
+        flags=IGNORECASE | MULTILINE,
+    )
+    return re.sub(r"\s+", " ", value).strip() if value else None
+
+
+def parse_metal_material(text):
+    material_values = re.findall(
+        r"(?:Material|Duct\s+Type)\s*:\s*([^\r\n]+)",
+        text,
+        flags=IGNORECASE,
+    )
+    material_text = " ".join(material_values)
+    searchable = f"{material_text} {text if re.search(r'double\s+wall', text, IGNORECASE) else ''}"
+    codes = []
+
+    def add(code):
+        if code not in codes:
+            codes.append(code)
+
+    if re.search(r"\bdouble\s+wall\b|\bDW\b", searchable, flags=IGNORECASE):
+        add("DW")
+    if re.search(r"(?:stainless\s+steel|\bSS\b)[^\r\n]{0,20}\b304\b|\b304\b[^\r\n]{0,20}(?:stainless\s+steel|\bSS\b)", searchable, flags=IGNORECASE):
+        add("SS 304")
+    if re.search(r"(?:stainless\s+steel|\bSS\b)[^\r\n]{0,20}\b316\b|\b316\b[^\r\n]{0,20}(?:stainless\s+steel|\bSS\b)", searchable, flags=IGNORECASE):
+        add("SS 316")
+    if re.search(r"\bgalvani[sz]ed\b|\bGI\b", searchable, flags=IGNORECASE):
+        add("GI")
+    if re.search(r"\balumini?um\b", searchable, flags=IGNORECASE):
+        add("AL")
+    if re.search(r"\bblack\s+steel\b", searchable, flags=IGNORECASE):
+        add("BS")
+    if re.search(r"\bmild\s+steel\b", searchable, flags=IGNORECASE):
+        add("MS")
+
+    if codes:
+        return " / ".join(codes)
+
+    if material_values:
+        value = re.sub(r"\s+x\s+\d+\s*$", "", material_values[0], flags=IGNORECASE)
+        return re.sub(r"\s+", " ", value).strip() or None
+
+    service_type = first_match(r"Service\s+Type\s*:\s*([^,\r\n]+)", text, flags=IGNORECASE)
+    return re.sub(r"\s+", " ", service_type).strip() if service_type else None
+
+
 def parse_dn_number(zone):
     if not zone:
         return None
@@ -217,6 +266,7 @@ def parse_pid_note(text, pages):
         "pidsupprod": supp_rod,
         "pidmnfqty": qty,
         "pidmaterial": material,
+        "vehicletype": parse_vehicle_type(text),
         "pdfdate": first_match(r"\b(\d{1,2}/\d{1,2}/\d{4})\b", text),
         "raw_text": text,
     }
@@ -265,6 +315,8 @@ def main():
         "ductweight": None if is_fixed else total_weight,
         "mnfweight": None if is_fixed else total_weight,
         "fixancweight": fixed_weight,
+        "metalmaterial": parse_metal_material(text),
+        "vehicletype": parse_vehicle_type(text),
         "pdfdate": first_match(r"Page:\s*\d+/\d+\s+Date:\s*([0-9/]+)", text),
         "raw_text": text,
     }

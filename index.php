@@ -104,6 +104,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                         <col class="col-delivery">
                         <col class="col-dn">
                         <col class="col-destination">
+                        <col class="col-vehicle">
                         <col class="col-added">
                         <col class="col-qty">
                         <col class="col-qty">
@@ -113,6 +114,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                         <col class="col-percent">
                         <col class="col-percent">
                         <col class="col-percent">
+                        <col class="col-delivery">
                         <col class="col-remark">
                         <col class="col-action">
                     </colgroup>
@@ -124,11 +126,13 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                             <th rowspan="2">Delivery Note#</th>
                             <th rowspan="2">DN #</th>
                             <th rowspan="2">Destination</th>
+                            <th rowspan="2">Vehicle Type</th>
                             <th rowspan="2">Added to Delivery</th>
                             <th rowspan="2">WOs Qty</th>
                             <th colspan="5">Shipment QTYs</th>
                             <th rowspan="2">Previously Delivered %</th>
                             <th rowspan="2">Total Delivered %</th>
+                            <th rowspan="2">Duct Type/Material</th>
                             <th rowspan="2">Remark</th>
                             <th rowspan="2">Action</th>
                         </tr>
@@ -142,7 +146,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                     </thead>
                     <tbody id="reportRows">
                         <tr class="empty-row">
-                            <td colspan="17">No work orders added yet.</td>
+                            <td colspan="19">No work orders added yet.</td>
                         </tr>
                     </tbody>
                     <tfoot>
@@ -150,17 +154,17 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                             <td class="add-row-cell">
                                 <button id="addManualMetalRow" class="add-row-icon" type="button" aria-label="Add manual Metal row" title="Add manual Metal row"><span aria-hidden="true">+</span></button>
                             </td>
-                            <td colspan="16" class="footer-blank"></td>
+                            <td colspan="18" class="footer-blank"></td>
                         </tr>
                         <tr>
-                            <td colspan="5" class="footer-blank"></td>
+                            <td colspan="6" class="footer-blank"></td>
                             <td colspan="2" class="grand-label">Grand Totals:</td>
                             <td id="totalWoQty">0 KGs</td>
                             <td id="totalMnf">0 KGs</td>
                             <td id="totalFixAnc">0 KGs</td>
                             <td id="totalShipment">0 KGs</td>
                             <td id="totalMnfQty">0 PCs</td>
-                            <td colspan="5" class="footer-blank"></td>
+                            <td colspan="6" class="footer-blank"></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -180,6 +184,8 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                             <col class="col-project">
                             <col class="col-delivery">
                             <col class="col-dn">
+                            <col class="col-destination">
+                            <col class="col-vehicle">
                             <col class="col-added">
                             <col class="col-qty">
                             <col class="col-qty">
@@ -200,6 +206,8 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                                 <th rowspan="2">Project</th>
                                 <th rowspan="2">Delivery Note#</th>
                                 <th rowspan="2">DN #</th>
+                                <th rowspan="2">Destination</th>
+                                <th rowspan="2">Vehicle Type</th>
                                 <th rowspan="2">Added to Delivery</th>
                                 <th rowspan="2">WOs Qty</th>
                                 <th colspan="5">Shipment QTYs</th>
@@ -219,7 +227,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                         </thead>
                         <tbody id="pidRows">
                             <tr class="empty-row">
-                                <td colspan="17">No PID work orders added yet.</td>
+                                <td colspan="19">No PID work orders added yet.</td>
                             </tr>
                         </tbody>
                         <tfoot>
@@ -227,10 +235,10 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                                 <td class="add-row-cell">
                                     <button id="addManualPidRow" class="add-row-icon" type="button" aria-label="Add manual PID row" title="Add manual PID row"><span aria-hidden="true">+</span></button>
                                 </td>
-                                <td colspan="16" class="footer-blank"></td>
+                                <td colspan="18" class="footer-blank"></td>
                             </tr>
                             <tr>
-                                <td colspan="4" class="footer-blank"></td>
+                                <td colspan="6" class="footer-blank"></td>
                                 <td colspan="2" class="grand-label">Grand Totals:</td>
                                 <td id="pidTotalWoQty">0 m²</td>
                                 <td id="pidTotalMnf">0 m²</td>
@@ -262,6 +270,8 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                             <col class="col-project">
                             <col class="col-delivery">
                             <col class="col-dn">
+                            <col class="col-destination">
+                            <col class="col-vehicle">
                             <col class="col-delivery">
                             <col class="col-customer">
                             <col class="col-qty">
@@ -277,6 +287,8 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                                 <th>Project</th>
                                 <th>Delivery Note#</th>
                                 <th>DN #</th>
+                                <th>Destination</th>
+                                <th>Vehicle Type</th>
                                 <th>Item No</th>
                                 <th>ItemName</th>
                                 <th>Qty</th>
@@ -288,7 +300,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                         </thead>
                         <tbody id="ancillaryRows">
                             <tr class="empty-row">
-                                <td colspan="12">No ancillary rows added yet.</td>
+                                <td colspan="14">No ancillary rows added yet.</td>
                             </tr>
                         </tbody>
                     </table>

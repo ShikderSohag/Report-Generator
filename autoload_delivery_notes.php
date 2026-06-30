@@ -34,11 +34,12 @@ try {
             d.pid_supp_rod,
             d.pid_mnf_qty,
             d.pid_material,
+            d.raw_data AS delivery_raw_data,
             w.customer_name,
             w.project_name AS work_order_project_name,
             w.destination,
             w.duct_weight AS work_order_duct_weight,
-            w.raw_data
+            w.raw_data AS work_order_raw_data
         FROM work_order_deliveries d
         LEFT JOIN work_orders w ON w.wo_no = d.wo_no
         ORDER BY d.wo_no ASC, d.dn_number ASC, d.id ASC
@@ -90,8 +91,11 @@ try {
 
 function deliveryPayload(array $row): array
 {
-    $raw = json_decode((string) ($row['raw_data'] ?? ''), true);
-    $raw = is_array($raw) ? $raw : [];
+    $workOrderRaw = json_decode((string) ($row['work_order_raw_data'] ?? ''), true);
+    $deliveryRaw = json_decode((string) ($row['delivery_raw_data'] ?? ''), true);
+    $workOrderRaw = is_array($workOrderRaw) ? $workOrderRaw : [];
+    $deliveryRaw = is_array($deliveryRaw) ? $deliveryRaw : [];
+    $raw = array_replace($workOrderRaw, $deliveryRaw);
     $ductSystem = strtolower(trim((string) ($row['duct_system'] ?? ''))) === 'pid' ? 'pid' : 'metal';
     $woNo = (string) ($row['wo_no'] ?? '');
     $displayDeliveryNote = preg_replace('/^W/i', '', $woNo);
@@ -103,6 +107,8 @@ function deliveryPayload(array $row): array
             'customer_name' => $row['customer_name'] ?? null,
             'project_name' => $row['delivery_project_name'] ?: ($row['work_order_project_name'] ?? null),
             'dn_number' => $row['dn_number'] ?? null,
+            'destination' => $row['destination'] ?? null,
+            'vehicle_type' => deliveryVehicleType($raw),
             'added_to_delivery' => 'Yes',
             'duct_system' => 'pid',
             'pid_area' => nullablePayloadNumber($row['pid_area'] ?? $row['mnf_weight'] ?? null),
@@ -128,6 +134,7 @@ function deliveryPayload(array $row): array
         'project_name' => $row['delivery_project_name'] ?: ($row['work_order_project_name'] ?? null),
         'dn_number' => $row['dn_number'] ?? null,
         'destination' => $row['destination'] ?? null,
+        'vehicle_type' => deliveryVehicleType($raw),
         'added_to_delivery' => 'Yes',
         'duct_system' => 'metal',
         'duct_weight' => $workOrderWeight,
@@ -135,7 +142,68 @@ function deliveryPayload(array $row): array
         'mnf_weight' => nullablePayloadNumber($row['mnf_weight'] ?? null),
         'fix_anc_weight' => nullablePayloadNumber($row['fix_anc_weight'] ?? null),
         'previous_mnf_weight' => nullablePayloadNumber($row['previous_mnf_weight'] ?? 0),
+        'material' => deliveryMetalMaterial($raw),
     ];
+}
+
+function deliveryMetadataText(array $raw, array $keys): ?string
+{
+    foreach ($keys as $key) {
+        $value = trim((string) ($raw[$key] ?? ''));
+        if ($value !== '') {
+            return $value;
+        }
+    }
+    return null;
+}
+
+function deliveryVehicleType(array $raw): ?string
+{
+    $value = deliveryMetadataText($raw, ['vehicletype', 'vehicle_type', 'vehicle']);
+    if ($value !== null) {
+        return $value;
+    }
+
+    $text = (string) ($raw['raw_text'] ?? '');
+    if (preg_match('/^(?:Vehicle\s+Type|Truck\s+Type|Vehicle)\s*:\s*(.+)$/mi', $text, $matches)) {
+        return trim(preg_replace('/\s+/', ' ', $matches[1]));
+    }
+    return null;
+}
+
+function deliveryMetalMaterial(array $raw): ?string
+{
+    $value = deliveryMetadataText($raw, ['metalmaterial', 'material', 'ducttype']);
+    if ($value !== null) {
+        return shortMetalMaterial($value);
+    }
+    return shortMetalMaterial(deliveryMetadataText($raw, ['raw_text']), false);
+}
+
+function shortMetalMaterial(?string $value, bool $allowOriginal = true): ?string
+{
+    $value = trim((string) $value);
+    if ($value === '') {
+        return null;
+    }
+
+    $codes = [];
+    $patterns = [
+        'DW' => '/\bDOUBLE\s+WALL\b|\bDW\b/i',
+        'SS 304' => '/(?:STAINLESS\s+STEEL|\bSS\b).*\b304\b|\b304\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i',
+        'SS 316' => '/(?:STAINLESS\s+STEEL|\bSS\b).*\b316\b|\b316\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i',
+        'GI' => '/\bGALVANI[ZS]ED\b|\bGI\b/i',
+        'AL' => '/\bALUMINI?UM\b/i',
+        'BS' => '/\bBLACK\s+STEEL\b/i',
+        'MS' => '/\bMILD\s+STEEL\b/i',
+    ];
+    foreach ($patterns as $code => $pattern) {
+        if (preg_match($pattern, $value)) {
+            $codes[] = $code;
+        }
+    }
+
+    return $codes ? implode(' / ', $codes) : ($allowOriginal ? $value : null);
 }
 
 function deliveryMatchesReportDate(array $row, string $reportDate): bool

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/db.php';
+require __DIR__ . '/report_schema.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -31,6 +32,7 @@ try {
 
     $pdo = db();
     ensureSchema($pdo);
+    ensureExtendedDeliveryReportSchema($pdo);
     $pdo->beginTransaction();
 
     if ($reportId) {
@@ -67,10 +69,10 @@ try {
     $insertItem = $pdo->prepare('
         INSERT INTO delivery_report_items
             (report_id, row_order, customer_name, project_name, delivery_note, dn_number, destination,
-             added_to_delivery, wo_qty, mnf_weight, fix_anc_weight, mnf_qty, previous_delivered_percent, remark)
+             vehicle_type, added_to_delivery, wo_qty, mnf_weight, fix_anc_weight, mnf_qty, previous_delivered_percent, material, remark)
         VALUES
             (:report_id, :row_order, :customer_name, :project_name, :delivery_note, :dn_number, :destination,
-             :added_to_delivery, :wo_qty, :mnf_weight, :fix_anc_weight, :mnf_qty, :previous_delivered_percent, :remark)
+             :vehicle_type, :added_to_delivery, :wo_qty, :mnf_weight, :fix_anc_weight, :mnf_qty, :previous_delivered_percent, :material, :remark)
     ');
 
     foreach (array_values($items) as $index => $item) {
@@ -86,22 +88,24 @@ try {
             ':delivery_note' => nullableReportText($item['delivery_note'] ?? null),
             ':dn_number' => nullableReportText($item['dn_number'] ?? null),
             ':destination' => nullableReportText($item['destination'] ?? null),
+            ':vehicle_type' => nullableReportText($item['vehicle_type'] ?? null),
             ':added_to_delivery' => nullableReportText($item['added_to_delivery'] ?? null),
             ':wo_qty' => nullableReportNumber($item['wo_qty'] ?? null),
             ':mnf_weight' => nullableReportNumber($item['mnf_weight'] ?? null),
             ':fix_anc_weight' => nullableReportNumber($item['fix_anc_weight'] ?? null),
             ':mnf_qty' => nullableReportNumber($item['mnf_qty'] ?? null),
             ':previous_delivered_percent' => nullableReportNumber($item['previous_delivered_percent'] ?? null),
+            ':material' => nullableReportText($item['material'] ?? null),
             ':remark' => nullableReportText($item['remark'] ?? null),
         ]);
     }
 
     $insertPidItem = $pdo->prepare('
         INSERT INTO delivery_report_pid_items
-            (report_id, row_order, customer_name, project_name, delivery_note, dn_number,
+            (report_id, row_order, customer_name, project_name, delivery_note, dn_number, destination, vehicle_type,
              added_to_delivery, wo_qty, mnf_area, supp_rod, mnf_qty, previous_delivered_percent, material, remark)
         VALUES
-            (:report_id, :row_order, :customer_name, :project_name, :delivery_note, :dn_number,
+            (:report_id, :row_order, :customer_name, :project_name, :delivery_note, :dn_number, :destination, :vehicle_type,
              :added_to_delivery, :wo_qty, :mnf_area, :supp_rod, :mnf_qty, :previous_delivered_percent, :material, :remark)
     ');
 
@@ -118,6 +122,8 @@ try {
                 ':project_name' => nullableReportText($item['project_name'] ?? null),
                 ':delivery_note' => nullableReportText($item['delivery_note'] ?? null),
                 ':dn_number' => nullableReportText($item['dn_number'] ?? null),
+                ':destination' => nullableReportText($item['destination'] ?? null),
+                ':vehicle_type' => nullableReportText($item['vehicle_type'] ?? null),
                 ':added_to_delivery' => nullableReportText($item['added_to_delivery'] ?? null),
                 ':wo_qty' => nullableReportNumber($item['wo_qty'] ?? null),
                 ':mnf_area' => nullableReportNumber($item['mnf_area'] ?? null),
@@ -132,10 +138,10 @@ try {
 
     $insertAncillaryItem = $pdo->prepare('
         INSERT INTO delivery_report_ancillary_items
-            (report_id, row_order, customer_name, project_name, delivery_note, dn_number,
+            (report_id, row_order, customer_name, project_name, delivery_note, dn_number, destination, vehicle_type,
              item_no, item_name, qty, previous_delivered_percent, total_delivered_percent, remark)
         VALUES
-            (:report_id, :row_order, :customer_name, :project_name, :delivery_note, :dn_number,
+            (:report_id, :row_order, :customer_name, :project_name, :delivery_note, :dn_number, :destination, :vehicle_type,
              :item_no, :item_name, :qty, :previous_delivered_percent, :total_delivered_percent, :remark)
     ');
 
@@ -152,6 +158,8 @@ try {
                 ':project_name' => nullableReportText($item['project_name'] ?? null),
                 ':delivery_note' => nullableReportText($item['delivery_note'] ?? null),
                 ':dn_number' => nullableReportText($item['dn_number'] ?? null),
+                ':destination' => nullableReportText($item['destination'] ?? null),
+                ':vehicle_type' => nullableReportText($item['vehicle_type'] ?? null),
                 ':item_no' => nullableReportText($item['item_no'] ?? null),
                 ':item_name' => nullableReportText($item['item_name'] ?? null),
                 ':qty' => nullableReportNumber($item['qty'] ?? null),

@@ -35,22 +35,34 @@ try {
         exit;
     }
 
-    if ((float) ($row['duct_weight'] ?? 0) <= 0 && !empty($row['raw_data'])) {
-        $raw = json_decode((string) $row['raw_data'], true);
-        if (is_array($raw) && isset($raw['ductweight']) && is_numeric($raw['ductweight'])) {
-            $row['duct_weight'] = $raw['ductweight'];
+    $workOrderRaw = json_decode((string) ($row['raw_data'] ?? ''), true);
+    $workOrderRaw = is_array($workOrderRaw) ? $workOrderRaw : [];
+    if ((float) ($row['duct_weight'] ?? 0) <= 0) {
+        if (isset($workOrderRaw['ductweight']) && is_numeric($workOrderRaw['ductweight'])) {
+            $row['duct_weight'] = $workOrderRaw['ductweight'];
         }
     }
+    $row['vehicle_type'] = lookupVehicleType($workOrderRaw);
+    $row['material'] = lookupMetalMaterial($workOrderRaw);
     unset($row['raw_data']);
 
     $deliveriesStatement = $pdo->prepare('
         SELECT dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date,
-               duct_system, pid_area, pid_supp_rod, pid_mnf_qty, pid_material
+               duct_system, pid_area, pid_supp_rod, pid_mnf_qty, pid_material, raw_data
         FROM work_order_deliveries
         WHERE wo_no IN (' . implode(',', array_fill(0, count($lookupValues), '?')) . ')
     ');
     $deliveriesStatement->execute($lookupValues);
     $deliveries = $deliveriesStatement->fetchAll();
+    foreach ($deliveries as &$delivery) {
+        $deliveryRaw = json_decode((string) ($delivery['raw_data'] ?? ''), true);
+        $deliveryRaw = is_array($deliveryRaw) ? $deliveryRaw : [];
+        $metadata = array_replace($workOrderRaw, $deliveryRaw);
+        $delivery['vehicle_type'] = lookupVehicleType($metadata);
+        $delivery['material'] = lookupMetalMaterial($metadata);
+        unset($delivery['raw_data']);
+    }
+    unset($delivery);
     $deliveries = withPreviousDeliveryTotals($deliveries);
 
     if (!$deliveries && !empty($row['dn_number'])) {
@@ -69,6 +81,8 @@ try {
             'pid_supp_rod' => $row['pid_supp_rod'],
             'pid_mnf_qty' => $row['pid_mnf_qty'],
             'pid_material' => $row['pid_material'],
+            'vehicle_type' => $row['vehicle_type'],
+            'material' => $row['material'],
             'previous_mnf_weight' => 0,
             'previous_pid_area' => 0,
         ];
@@ -108,6 +122,66 @@ function withPreviousDeliveryTotals(array $deliveries): array
     unset($delivery);
 
     return $deliveries;
+}
+
+function lookupMetadataText(array $raw, array $keys): ?string
+{
+    foreach ($keys as $key) {
+        $value = trim((string) ($raw[$key] ?? ''));
+        if ($value !== '') {
+            return $value;
+        }
+    }
+    return null;
+}
+
+function lookupVehicleType(array $raw): ?string
+{
+    $value = lookupMetadataText($raw, ['vehicletype', 'vehicle_type', 'vehicle']);
+    if ($value !== null) {
+        return $value;
+    }
+
+    $text = (string) ($raw['raw_text'] ?? '');
+    if (preg_match('/^(?:Vehicle\s+Type|Truck\s+Type|Vehicle)\s*:\s*(.+)$/mi', $text, $matches)) {
+        return trim(preg_replace('/\s+/', ' ', $matches[1]));
+    }
+    return null;
+}
+
+function lookupMetalMaterial(array $raw): ?string
+{
+    $value = lookupMetadataText($raw, ['metalmaterial', 'material', 'ducttype']);
+    if ($value !== null) {
+        return shortLookupMetalMaterial($value);
+    }
+    return shortLookupMetalMaterial(lookupMetadataText($raw, ['raw_text']), false);
+}
+
+function shortLookupMetalMaterial(?string $value, bool $allowOriginal = true): ?string
+{
+    $value = trim((string) $value);
+    if ($value === '') {
+        return null;
+    }
+
+    $codes = [];
+    $patterns = [
+        'DW' => '/\bDOUBLE\s+WALL\b|\bDW\b/i',
+        'SS 304' => '/(?:STAINLESS\s+STEEL|\bSS\b).*\b304\b|\b304\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i',
+        'SS 316' => '/(?:STAINLESS\s+STEEL|\bSS\b).*\b316\b|\b316\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i',
+        'GI' => '/\bGALVANI[ZS]ED\b|\bGI\b/i',
+        'AL' => '/\bALUMINI?UM\b/i',
+        'BS' => '/\bBLACK\s+STEEL\b/i',
+        'MS' => '/\bMILD\s+STEEL\b/i',
+    ];
+    foreach ($patterns as $code => $pattern) {
+        if (preg_match($pattern, $value)) {
+            $codes[] = $code;
+        }
+    }
+
+    return $codes ? implode(' / ', $codes) : ($allowOriginal ? $value : null);
 }
 
 function deliverySortValue(mixed $dnNumber): int

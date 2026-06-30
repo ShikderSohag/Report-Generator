@@ -49,11 +49,11 @@ function buildDailyReportSheet(string $reportDate, array $items, array $pidItems
     $row = 1;
 
     $rows[] = excelRow($row, [excelTextCell('A' . $row, 'Duct & Fittings - Daily Delivery Report', 1)], 28);
-    $merges[] = 'A1:P1';
+    $merges[] = 'A1:R1';
     $row += 2;
 
     if ($items) {
-        $headers = ['#', 'Customer', 'Project', 'Delivery Note#', 'DN #', 'Destination', 'Added to Delivery', 'WOs Qty', 'MNF', 'Fix Anc.', 'Total', 'MNF Qty', '%', 'Previously Delivered %', 'Total Delivered %', 'Remark'];
+        $headers = ['#', 'Customer', 'Project', 'Delivery Note#', 'DN #', 'Destination', 'Vehicle Type', 'Added to Delivery', 'WOs Qty', 'MNF', 'Fix Anc.', 'Total', 'MNF Qty', '%', 'Previously Delivered %', 'Total Delivered %', 'Duct Type/Material', 'Remark'];
         $rows[] = excelSectionRow($row, 'Duct & Fittings Delivered WOs (Metal Ducts)', $reportDate, $merges);
         $row++;
         $rows[] = excelHeaderRow($row, $headers);
@@ -74,16 +74,18 @@ function buildDailyReportSheet(string $reportDate, array $items, array $pidItems
                 excelTextCell('D' . $row, $item['delivery_note'] ?? '', 12),
                 excelTextCell('E' . $row, $item['dn_number'] ?? '', 12),
                 excelTextCell('F' . $row, $item['destination'] ?? '', 12),
-                excelTextCell('G' . $row, $item['added_to_delivery'] ?? '', 12),
-                excelNumberCell('H' . $row, $woQty, 6),
-                excelNumberCell('I' . $row, $mnf, 6),
-                excelNumberCell('J' . $row, $fix, 6),
-                excelFormulaCell('K' . $row, "I{$row}+J{$row}", $mnf + $fix, 7),
-                excelNumberCell('L' . $row, $mnfQty, 14),
-                excelFormulaCell('M' . $row, "IF(H{$row}>0,I{$row}/H{$row},0)", $shipment, 9),
-                excelNumberCell('N' . $row, $previous, 8),
-                excelFormulaCell('O' . $row, "N{$row}+M{$row}", $previous + $shipment, 9),
-                excelTextCell('P' . $row, $item['remark'] ?? '', 5),
+                excelTextCell('G' . $row, $item['vehicle_type'] ?? '', 12),
+                excelTextCell('H' . $row, $item['added_to_delivery'] ?? '', 12),
+                excelNumberCell('I' . $row, $woQty, 6),
+                excelNumberCell('J' . $row, $mnf, 6),
+                excelNumberCell('K' . $row, $fix, 6),
+                excelFormulaCell('L' . $row, "J{$row}+K{$row}", $mnf + $fix, 7),
+                excelNumberCell('M' . $row, $mnfQty, 14),
+                excelFormulaCell('N' . $row, "IF(I{$row}>0,J{$row}/I{$row},0)", $shipment, 9),
+                excelNumberCell('O' . $row, $previous, 8),
+                excelFormulaCell('P' . $row, "O{$row}+N{$row}", $previous + $shipment, 9),
+                excelTextCell('Q' . $row, $item['material'] ?? '', 12),
+                excelTextCell('R' . $row, $item['remark'] ?? '', 5),
             ];
             $rows[] = excelRow($row, $cells, 28);
             $row++;
@@ -91,14 +93,14 @@ function buildDailyReportSheet(string $reportDate, array $items, array $pidItems
 
         $dataEnd = $row - 1;
         $rows[] = excelTotalsRow($row, $dataStart, $dataEnd, [
-            'H' => 11, 'I' => 11, 'J' => 11, 'K' => 11, 'L' => 13,
-        ], 'F');
-        $merges[] = 'F' . $row . ':G' . $row;
+            'I' => 11, 'J' => 11, 'K' => 11, 'L' => 11, 'M' => 13,
+        ], 'G');
+        $merges[] = 'G' . $row . ':H' . $row;
         $row += 2;
     }
 
     if ($pidItems) {
-        $headers = ['#', 'Customer', 'Project', 'Delivery Note#', 'DN #', 'Added to Delivery', 'WOs Qty', 'MNF', 'Supp. Rod', 'Total', 'MNF Qty', '%', 'Previously Delivered %', 'Total Delivered %', 'Duct Type/Material', 'Remark'];
+        $headers = ['#', 'Customer', 'Project', 'Delivery Note#', 'DN #', 'Destination', 'Vehicle Type', 'Added to Delivery', 'WOs Qty', 'MNF', 'Supp. Rod', 'Total', 'MNF Qty', '%', 'Previously Delivered %', 'Total Delivered %', 'Duct Type/Material', 'Remark'];
         $rows[] = excelSectionRow($row, 'Duct & Fittings Delivered WOs (PID)', $reportDate, $merges);
         $row++;
         $rows[] = excelHeaderRow($row, $headers);
@@ -118,17 +120,19 @@ function buildDailyReportSheet(string $reportDate, array $items, array $pidItems
                 excelTextCell('C' . $row, $item['project_name'] ?? '', 5),
                 excelTextCell('D' . $row, $item['delivery_note'] ?? '', 12),
                 excelTextCell('E' . $row, $item['dn_number'] ?? '', 12),
-                excelTextCell('F' . $row, $item['added_to_delivery'] ?? '', 12),
-                excelNumberCell('G' . $row, $woQty, 6),
-                excelNumberCell('H' . $row, $mnf, 6),
-                excelNumberCell('I' . $row, $suppRod, 6),
-                excelFormulaCell('J' . $row, "H{$row}", $mnf, 7),
-                excelNumberCell('K' . $row, $mnfQty, 14),
-                excelFormulaCell('L' . $row, "IF(G{$row}>0,H{$row}/G{$row},0)", $shipment, 9),
-                excelNumberCell('M' . $row, $previous, 8),
-                excelFormulaCell('N' . $row, "M{$row}+L{$row}", $previous + $shipment, 9),
-                excelTextCell('O' . $row, $item['material'] ?? '', 5),
-                excelTextCell('P' . $row, $item['remark'] ?? '', 5),
+                excelTextCell('F' . $row, $item['destination'] ?? '', 12),
+                excelTextCell('G' . $row, $item['vehicle_type'] ?? '', 12),
+                excelTextCell('H' . $row, $item['added_to_delivery'] ?? '', 12),
+                excelNumberCell('I' . $row, $woQty, 6),
+                excelNumberCell('J' . $row, $mnf, 6),
+                excelNumberCell('K' . $row, $suppRod, 6),
+                excelFormulaCell('L' . $row, "J{$row}", $mnf, 7),
+                excelNumberCell('M' . $row, $mnfQty, 14),
+                excelFormulaCell('N' . $row, "IF(I{$row}>0,J{$row}/I{$row},0)", $shipment, 9),
+                excelNumberCell('O' . $row, $previous, 8),
+                excelFormulaCell('P' . $row, "O{$row}+N{$row}", $previous + $shipment, 9),
+                excelTextCell('Q' . $row, $item['material'] ?? '', 5),
+                excelTextCell('R' . $row, $item['remark'] ?? '', 5),
             ];
             $rows[] = excelRow($row, $cells, 28);
             $row++;
@@ -136,17 +140,17 @@ function buildDailyReportSheet(string $reportDate, array $items, array $pidItems
 
         $dataEnd = $row - 1;
         $rows[] = excelTotalsRow($row, $dataStart, $dataEnd, [
-            'G' => 11, 'H' => 11, 'I' => 11, 'J' => 11, 'K' => 13,
-        ], 'E');
-        $merges[] = 'E' . $row . ':F' . $row;
+            'I' => 11, 'J' => 11, 'K' => 11, 'L' => 11, 'M' => 13,
+        ], 'G');
+        $merges[] = 'G' . $row . ':H' . $row;
         $row += 2;
     }
 
     if ($ancillaryItems) {
-        $headers = ['#', 'Customer', 'Project', 'Delivery Note#', 'DN #', 'Item No', 'Item Name', 'Qty', 'Previously Delivered %', 'Total Delivered %', 'Remark'];
-        $rows[] = excelRow($row, [excelTextCell('A' . $row, 'Ancillaries', 2), excelTextCell('J' . $row, 'Report Date: ' . $reportDate, 3)], 20);
-        $merges[] = 'A' . $row . ':I' . $row;
-        $merges[] = 'J' . $row . ':K' . $row;
+        $headers = ['#', 'Customer', 'Project', 'Delivery Note#', 'DN #', 'Destination', 'Vehicle Type', 'Item No', 'Item Name', 'Qty', 'Previously Delivered %', 'Total Delivered %', 'Remark'];
+        $rows[] = excelRow($row, [excelTextCell('A' . $row, 'Ancillaries', 2), excelTextCell('L' . $row, 'Report Date: ' . $reportDate, 3)], 20);
+        $merges[] = 'A' . $row . ':K' . $row;
+        $merges[] = 'L' . $row . ':M' . $row;
         $row++;
         $rows[] = excelHeaderRow($row, $headers);
         $dataStart = ++$row;
@@ -160,22 +164,24 @@ function buildDailyReportSheet(string $reportDate, array $items, array $pidItems
                 excelTextCell('C' . $row, $item['project_name'] ?? '', 5),
                 excelTextCell('D' . $row, $item['delivery_note'] ?? '', 12),
                 excelTextCell('E' . $row, $item['dn_number'] ?? '', 12),
-                excelTextCell('F' . $row, $item['item_no'] ?? '', 12),
-                excelTextCell('G' . $row, $item['item_name'] ?? '', 5),
-                excelNumberCell('H' . $row, excelPayloadNumber($item['qty'] ?? 0), 6),
-                excelNumberCell('I' . $row, $previous, 8),
-                excelNumberCell('J' . $row, $total, 8),
-                excelTextCell('K' . $row, $item['remark'] ?? '', 5),
+                excelTextCell('F' . $row, $item['destination'] ?? '', 12),
+                excelTextCell('G' . $row, $item['vehicle_type'] ?? '', 12),
+                excelTextCell('H' . $row, $item['item_no'] ?? '', 12),
+                excelTextCell('I' . $row, $item['item_name'] ?? '', 5),
+                excelNumberCell('J' . $row, excelPayloadNumber($item['qty'] ?? 0), 6),
+                excelNumberCell('K' . $row, $previous, 8),
+                excelNumberCell('L' . $row, $total, 8),
+                excelTextCell('M' . $row, $item['remark'] ?? '', 5),
             ];
             $rows[] = excelRow($row, $cells, 28);
             $row++;
         }
 
         $dataEnd = $row - 1;
-        $cells = [excelTextCell('F' . $row, 'Grand Totals:', 10)];
-        $cells[] = excelFormulaCell('H' . $row, "SUM(H{$dataStart}:H{$dataEnd})", 0, 11);
+        $cells = [excelTextCell('H' . $row, 'Grand Totals:', 10)];
+        $cells[] = excelFormulaCell('J' . $row, "SUM(J{$dataStart}:J{$dataEnd})", 0, 11);
         $rows[] = excelRow($row, $cells, 20);
-        $merges[] = 'F' . $row . ':G' . $row;
+        $merges[] = 'H' . $row . ':I' . $row;
         $row++;
     }
 
@@ -183,7 +189,7 @@ function buildDailyReportSheet(string $reportDate, array $items, array $pidItems
     $mergeXml = $merges
         ? '<mergeCells count="' . count($merges) . '">' . implode('', array_map(static fn (string $range): string => '<mergeCell ref="' . $range . '"/>', $merges)) . '</mergeCells>'
         : '';
-    $columns = [4, 25, 23, 16, 10, 15, 18, 12, 12, 12, 12, 11, 12, 15, 18, 24];
+    $columns = [4, 23, 21, 15, 10, 14, 12, 16, 12, 12, 12, 12, 11, 11, 14, 15, 16, 22];
     $columnXml = '<cols>';
     foreach ($columns as $index => $width) {
         $column = $index + 1;
@@ -194,7 +200,7 @@ function buildDailyReportSheet(string $reportDate, array $items, array $pidItems
     $sheetXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
         . '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>'
-        . '<dimension ref="A1:P' . $lastRow . '"/>'
+        . '<dimension ref="A1:R' . $lastRow . '"/>'
         . '<sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
         . '<sheetFormatPr defaultRowHeight="15"/>'
         . $columnXml
@@ -209,11 +215,11 @@ function buildDailyReportSheet(string $reportDate, array $items, array $pidItems
 
 function excelSectionRow(int $row, string $title, string $reportDate, array &$merges): string
 {
-    $merges[] = 'A' . $row . ':N' . $row;
-    $merges[] = 'O' . $row . ':P' . $row;
+    $merges[] = 'A' . $row . ':P' . $row;
+    $merges[] = 'Q' . $row . ':R' . $row;
     return excelRow($row, [
         excelTextCell('A' . $row, $title, 2),
-        excelTextCell('O' . $row, 'Report Date: ' . $reportDate, 3),
+        excelTextCell('Q' . $row, 'Report Date: ' . $reportDate, 3),
     ], 20);
 }
 
@@ -321,7 +327,7 @@ function excelWorkbookRelationships(): string
 
 function excelWorkbook(string $sheetName, int $lastRow): string
 {
-    $printArea = '&apos;' . excelXml($sheetName) . '&apos;!$A$1:$P$' . $lastRow;
+    $printArea = '&apos;' . excelXml($sheetName) . '&apos;!$A$1:$R$' . $lastRow;
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
         . '<workbookPr date1904="0"/>'

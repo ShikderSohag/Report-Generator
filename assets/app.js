@@ -499,6 +499,7 @@ function addReportRow(data) {
         <td><input class="cell-input short delivery-note-input" type="text" placeholder="Delivery Note" value="${escapeHtml(data.wo_no || data.delivery_note || '')}"></td>
         <td><input class="cell-input short" type="text" placeholder="DN" value="${escapeHtml(data.dn_number || '')}"></td>
         <td><input class="cell-input" type="text" placeholder="Destination" value="${escapeHtml(data.destination || '')}"></td>
+        <td><input class="cell-input short" type="text" placeholder="Vehicle Type" value="${escapeHtml(data.vehicle_type || '')}"></td>
         <td>
             <select class="cell-input short">
                 <option ${data.added_to_delivery === 'Yes' ? 'selected' : ''}>Yes</option>
@@ -513,6 +514,7 @@ function addReportRow(data) {
         <td class="shipment-percent">0%</td>
         <td><div class="percent-input"><input class="cell-input number manual-prev" type="text" inputmode="decimal" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
         <td class="delivered-total">0%</td>
+        <td><input class="cell-input short" type="text" placeholder="Material" value="${escapeHtml(data.material || data.metal_material || '')}"></td>
         <td><textarea class="cell-input remark" rows="2" placeholder="Remark">${escapeHtml(data.remark || '')}</textarea></td>
         <td><button class="remove-row" type="button">Remove</button></td>
     `;
@@ -620,6 +622,8 @@ function addPidReportRow(data) {
         <td><input class="cell-input" type="text" placeholder="Project" value="${escapeHtml(data.project_name || '')}"></td>
         <td><input class="cell-input short delivery-note-input" type="text" placeholder="Delivery Note" value="${escapeHtml(data.wo_no || data.delivery_note || '')}"></td>
         <td><input class="cell-input short" type="text" placeholder="DN" value="${escapeHtml(data.dn_number || '')}"></td>
+        <td><input class="cell-input" type="text" placeholder="Destination" value="${escapeHtml(data.destination || '')}"></td>
+        <td><input class="cell-input short" type="text" placeholder="Vehicle Type" value="${escapeHtml(data.vehicle_type || '')}"></td>
         <td>
             <select class="cell-input short">
                 <option ${data.added_to_delivery === 'Yes' ? 'selected' : ''}>Yes</option>
@@ -726,6 +730,8 @@ function mergeDelivery(baseData, delivery) {
         ...baseData,
         ...delivery,
         project_name: delivery.project_name || baseData.project_name,
+        destination: delivery.destination || baseData.destination,
+        vehicle_type: delivery.vehicle_type || baseData.vehicle_type,
         edd: delivery.edd || baseData.edd,
         wo_qty: delivery.wo_qty || baseData.wo_qty,
         duct_weight: baseData.duct_weight,
@@ -736,6 +742,7 @@ function mergeDelivery(baseData, delivery) {
         pid_supp_rod: delivery.pid_supp_rod || baseData.pid_supp_rod,
         pid_mnf_qty: delivery.pid_mnf_qty || baseData.pid_mnf_qty,
         pid_material: delivery.pid_material || baseData.pid_material,
+        material: delivery.material || baseData.material,
         previous_mnf_weight: delivery.previous_mnf_weight,
         previous_pid_area: delivery.previous_pid_area,
     };
@@ -766,7 +773,7 @@ function showEmptyRowIfNeeded() {
 
     const row = document.createElement('tr');
     row.className = 'empty-row';
-    row.innerHTML = '<td colspan="17">No work orders added yet.</td>';
+    row.innerHTML = '<td colspan="19">No work orders added yet.</td>';
     reportRows.appendChild(row);
     updateGrandTotals();
 }
@@ -914,13 +921,15 @@ function collectReportItems() {
         delivery_note: cellValue(row, 3),
         dn_number: cellValue(row, 4),
         destination: cellValue(row, 5),
-        added_to_delivery: cellValue(row, 6),
-        wo_qty: numberValue(cellValue(row, 7)),
-        mnf_weight: numberValue(cellValue(row, 8)),
-        fix_anc_weight: numberValue(cellValue(row, 9)),
-        mnf_qty: numberValue(cellValue(row, 11)),
-        previous_delivered_percent: numberValue(cellValue(row, 13)),
-        remark: cellValue(row, 15),
+        vehicle_type: cellValue(row, 6),
+        added_to_delivery: cellValue(row, 7),
+        wo_qty: numberValue(cellValue(row, 8)),
+        mnf_weight: numberValue(cellValue(row, 9)),
+        fix_anc_weight: numberValue(cellValue(row, 10)),
+        mnf_qty: numberValue(cellValue(row, 12)),
+        previous_delivered_percent: numberValue(cellValue(row, 14)),
+        material: cellValue(row, 16),
+        remark: cellValue(row, 17),
     }));
 }
 
@@ -930,14 +939,16 @@ function collectPidItems() {
         project_name: cellValue(row, 2),
         delivery_note: cellValue(row, 3),
         dn_number: cellValue(row, 4),
-        added_to_delivery: cellValue(row, 5),
-        wo_qty: numberValue(cellValue(row, 6)),
-        mnf_area: numberValue(cellValue(row, 7)),
-        supp_rod: numberValue(cellValue(row, 8)),
-        mnf_qty: numberValue(cellValue(row, 10)),
-        previous_delivered_percent: numberValue(cellValue(row, 12)),
-        material: cellValue(row, 14),
-        remark: cellValue(row, 15),
+        destination: cellValue(row, 5),
+        vehicle_type: cellValue(row, 6),
+        added_to_delivery: cellValue(row, 7),
+        wo_qty: numberValue(cellValue(row, 8)),
+        mnf_area: numberValue(cellValue(row, 9)),
+        supp_rod: numberValue(cellValue(row, 10)),
+        mnf_qty: numberValue(cellValue(row, 12)),
+        previous_delivered_percent: numberValue(cellValue(row, 14)),
+        material: cellValue(row, 16),
+        remark: cellValue(row, 17),
     }));
 }
 
@@ -952,7 +963,7 @@ function showEmptyPidRowIfNeeded() {
         return;
     }
 
-    pidRows.innerHTML = '<tr class="empty-row"><td colspan="17">No PID work orders added yet.</td></tr>';
+    pidRows.innerHTML = '<tr class="empty-row"><td colspan="19">No PID work orders added yet.</td></tr>';
     updatePidGrandTotals();
 }
 
@@ -969,6 +980,8 @@ function addAncillaryTableRow(data) {
         <td><input class="cell-input" type="text" placeholder="Project" value="${escapeHtml(data.project_name || '')}"></td>
         <td><input class="cell-input short" type="text" placeholder="Delivery Note" value="${escapeHtml(data.delivery_note || '')}"></td>
         <td><input class="cell-input short" type="text" placeholder="DN" value="${escapeHtml(data.dn_number || '')}"></td>
+        <td><input class="cell-input" type="text" placeholder="Destination" value="${escapeHtml(data.destination || '')}"></td>
+        <td><input class="cell-input short" type="text" placeholder="Vehicle Type" value="${escapeHtml(data.vehicle_type || '')}"></td>
         <td><input class="cell-input short" type="text" placeholder="Item No" value="${escapeHtml(data.item_no || '')}"></td>
         <td><input class="cell-input" type="text" placeholder="ItemName" value="${escapeHtml(data.item_name || '')}"></td>
         <td><input class="cell-input number" type="number" min="0" step="0.01" value="${formatRawNumber(data.qty || 0)}"></td>
@@ -995,18 +1008,22 @@ function collectAncillaryItems() {
             project_name: cellValue(row, 2),
             delivery_note: cellValue(row, 3),
             dn_number: cellValue(row, 4),
-            item_no: cellValue(row, 5),
-            item_name: cellValue(row, 6),
-            qty: numberValue(cellValue(row, 7)),
-            previous_delivered_percent: numberValue(cellValue(row, 8)),
-            total_delivered_percent: numberValue(cellValue(row, 9)),
-            remark: cellValue(row, 10),
+            destination: cellValue(row, 5),
+            vehicle_type: cellValue(row, 6),
+            item_no: cellValue(row, 7),
+            item_name: cellValue(row, 8),
+            qty: numberValue(cellValue(row, 9)),
+            previous_delivered_percent: numberValue(cellValue(row, 10)),
+            total_delivered_percent: numberValue(cellValue(row, 11)),
+            remark: cellValue(row, 12),
         }))
         .filter((item) => (
             item.customer_name
             || item.project_name
             || item.delivery_note
             || item.dn_number
+            || item.destination
+            || item.vehicle_type
             || item.item_no
             || item.item_name
             || item.remark
@@ -1026,7 +1043,7 @@ function showEmptyAncillaryRowIfNeeded() {
         return;
     }
 
-    ancillaryRows.innerHTML = '<tr class="empty-row"><td colspan="12">No ancillary rows added yet.</td></tr>';
+    ancillaryRows.innerHTML = '<tr class="empty-row"><td colspan="14">No ancillary rows added yet.</td></tr>';
 }
 
 async function loadReportList() {
@@ -1129,12 +1146,14 @@ async function loadSavedReport(reportId) {
                 delivery_note: item.delivery_note,
                 dn_number: item.dn_number,
                 destination: item.destination,
+                vehicle_type: item.vehicle_type,
                 added_to_delivery: item.added_to_delivery || 'Yes',
                 duct_weight: item.wo_qty,
                 wo_qty: item.mnf_qty,
                 mnf_weight: item.mnf_weight,
                 fix_anc_weight: item.fix_anc_weight,
                 previous_delivered_percent: item.previous_delivered_percent,
+                material: item.material,
                 remark: item.remark,
             });
         });
@@ -1146,6 +1165,8 @@ async function loadSavedReport(reportId) {
                 wo_no: item.delivery_note,
                 delivery_note: item.delivery_note,
                 dn_number: item.dn_number,
+                destination: item.destination,
+                vehicle_type: item.vehicle_type,
                 added_to_delivery: item.added_to_delivery || 'Yes',
                 pid_area: item.wo_qty,
                 pid_supp_rod: item.supp_rod,
@@ -1169,17 +1190,17 @@ async function loadSavedReport(reportId) {
 }
 
 function clearReportRows() {
-    reportRows.innerHTML = '<tr class="empty-row"><td colspan="17">No work orders added yet.</td></tr>';
+    reportRows.innerHTML = '<tr class="empty-row"><td colspan="19">No work orders added yet.</td></tr>';
     addedWorkOrders.clear();
     updateGrandTotals();
 }
 
 function clearAncillaryRows() {
-    ancillaryRows.innerHTML = '<tr class="empty-row"><td colspan="12">No ancillary rows added yet.</td></tr>';
+    ancillaryRows.innerHTML = '<tr class="empty-row"><td colspan="14">No ancillary rows added yet.</td></tr>';
 }
 
 function clearPidRows() {
-    pidRows.innerHTML = '<tr class="empty-row"><td colspan="17">No PID work orders added yet.</td></tr>';
+    pidRows.innerHTML = '<tr class="empty-row"><td colspan="19">No PID work orders added yet.</td></tr>';
     updatePidGrandTotals();
 }
 
@@ -1191,6 +1212,7 @@ function exportPdf(rows, pidReportRows) {
         'Delivery Note#',
         'DN #',
         'Destination',
+        'Vehicle Type',
         'Added to Delivery',
         'WOs Qty',
         'MNF',
@@ -1200,6 +1222,7 @@ function exportPdf(rows, pidReportRows) {
         '%',
         'Previously Delivered %',
         'Total Delivered %',
+        'Duct Type/Material',
         'Remark',
     ];
 
@@ -1211,15 +1234,17 @@ function exportPdf(rows, pidReportRows) {
         cellValue(row, 4),
         cellValue(row, 5),
         cellValue(row, 6),
-        formatKg(cellValue(row, 7)),
+        cellValue(row, 7),
         formatKg(cellValue(row, 8)),
         formatKg(cellValue(row, 9)),
         formatKg(cellValue(row, 10)),
-        formatPcs(cellValue(row, 11)),
-        cellValue(row, 12),
+        formatKg(cellValue(row, 11)),
+        formatPcs(cellValue(row, 12)),
         cellValue(row, 13),
         cellValue(row, 14),
         cellValue(row, 15),
+        cellValue(row, 16),
+        cellValue(row, 17),
     ]);
 
     const reportDate = document.querySelector('#report_date')?.value || new Date().toISOString().slice(0, 10);
@@ -1230,7 +1255,7 @@ function exportPdf(rows, pidReportRows) {
         return;
     }
 
-    const bodyRows = renderMergedExportRows(data, [1, 2, 3, 4], [0, 1, 2, 3, 4]);
+    const bodyRows = renderMergedExportRows(data, [1, 2, 3, 4, 5, 6], [0, 1, 2, 3, 4, 5, 6]);
     const metalSection = rows.length ? `
             <div class="title">Duct &amp; Fittings - Daily Delivery Report</div>
             <div class="meta metal-meta">
@@ -1245,6 +1270,7 @@ function exportPdf(rows, pidReportRows) {
                     <col class="delivery-col-note">
                     <col class="delivery-col-dn">
                     <col class="delivery-col-destination">
+                    <col class="delivery-col-vehicle">
                     <col class="delivery-col-added">
                     <col class="delivery-col-weight">
                     <col class="delivery-col-weight">
@@ -1254,6 +1280,7 @@ function exportPdf(rows, pidReportRows) {
                     <col class="delivery-col-percent">
                     <col class="delivery-col-percent-wide">
                     <col class="delivery-col-total-delivered">
+                    <col class="delivery-col-material">
                     <col class="delivery-col-remark">
                 </colgroup>
                 <thead>
@@ -1269,12 +1296,13 @@ function exportPdf(rows, pidReportRows) {
                         <td class="footer-empty"></td>
                         <td class="footer-empty"></td>
                         <td class="footer-empty"></td>
-                        <td colspan="2" class="grand-total-label">Grand Totals:</td>
+                        <td colspan="3" class="grand-total-label">Grand Totals:</td>
                         <td>${escapeHtml(totalWoQty.textContent)}</td>
                         <td>${escapeHtml(totalMnf.textContent)}</td>
                         <td>${escapeHtml(totalFixAnc.textContent)}</td>
                         <td>${escapeHtml(totalShipment.textContent)}</td>
                         <td>${escapeHtml(totalMnfQty.textContent)}</td>
+                        <td class="footer-empty"></td>
                         <td class="footer-empty"></td>
                         <td class="footer-empty"></td>
                         <td class="footer-empty"></td>
@@ -1290,16 +1318,18 @@ function exportPdf(rows, pidReportRows) {
         cellValue(row, 3),
         cellValue(row, 4),
         cellValue(row, 5),
-        formatSquareMeters(cellValue(row, 6)),
-        formatSquareMeters(cellValue(row, 7)),
-        formatMeters(cellValue(row, 8)),
+        cellValue(row, 6),
+        cellValue(row, 7),
+        formatSquareMeters(cellValue(row, 8)),
         formatSquareMeters(cellValue(row, 9)),
-        formatPcs(cellValue(row, 10)),
-        cellValue(row, 11),
-        cellValue(row, 12),
+        formatMeters(cellValue(row, 10)),
+        formatSquareMeters(cellValue(row, 11)),
+        formatPcs(cellValue(row, 12)),
         cellValue(row, 13),
         cellValue(row, 14),
         cellValue(row, 15),
+        cellValue(row, 16),
+        cellValue(row, 17),
     ]);
     const pidHeaders = [
         '#',
@@ -1307,6 +1337,8 @@ function exportPdf(rows, pidReportRows) {
         'Project',
         'Delivery Note#',
         'DN #',
+        'Destination',
+        'Vehicle Type',
         'Added to Delivery',
         'WOs Qty',
         'MNF',
@@ -1319,7 +1351,7 @@ function exportPdf(rows, pidReportRows) {
         'Duct Type/Material',
         'Remark',
     ];
-    const pidBodyRows = renderMergedExportRows(pidData, [1, 2, 3, 4], [0, 1, 2, 3, 4]);
+    const pidBodyRows = renderMergedExportRows(pidData, [1, 2, 3, 4, 5, 6], [0, 1, 2, 3, 4, 5, 6]);
     const pidSection = pidReportRows.length ? `
             ${rows.length ? '' : '<div class="title">Duct &amp; Fittings - Daily Delivery Report</div>'}
             <div class="meta pid-meta">
@@ -1333,6 +1365,8 @@ function exportPdf(rows, pidReportRows) {
                     <col class="delivery-col-project">
                     <col class="delivery-col-note">
                     <col class="delivery-col-dn">
+                    <col class="delivery-col-destination">
+                    <col class="delivery-col-vehicle">
                     <col class="delivery-col-added">
                     <col class="delivery-col-weight">
                     <col class="delivery-col-weight">
@@ -1357,7 +1391,8 @@ function exportPdf(rows, pidReportRows) {
                         <td class="footer-empty"></td>
                         <td class="footer-empty"></td>
                         <td class="footer-empty"></td>
-                        <td colspan="2" class="grand-total-label">Grand Totals:</td>
+                        <td class="footer-empty"></td>
+                        <td colspan="3" class="grand-total-label">Grand Totals:</td>
                         <td>${escapeHtml(pidTotalWoQty.textContent)}</td>
                         <td>${escapeHtml(pidTotalMnf.textContent)}</td>
                         <td>${escapeHtml(pidTotalSuppRod.textContent)}</td>
@@ -1379,6 +1414,8 @@ function exportPdf(rows, pidReportRows) {
         item.project_name,
         item.delivery_note,
         item.dn_number,
+        item.destination,
+        item.vehicle_type,
         item.item_no,
         item.item_name,
         formatNumber(item.qty),
@@ -1388,9 +1425,9 @@ function exportPdf(rows, pidReportRows) {
     ]);
     const ancillaryBodyRows = renderMergedExportRows(
         ancillaryRowsForExport,
-        [1, 2, 3, 4],
-        [0, 1, 2, 3, 4],
-        { classByColumn: { 9: 'delivered-green' } }
+        [1, 2, 3, 4, 5, 6],
+        [0, 1, 2, 3, 4, 5, 6],
+        { classByColumn: { 11: 'delivered-green' } }
     );
     const ancillarySection = ancillaryItems.length ? `
         <section class="ancillary-print-section">
@@ -1401,12 +1438,14 @@ function exportPdf(rows, pidReportRows) {
             <table class="ancillary-print-table">
                 <colgroup>
                     <col style="width: 2%;">
-                    <col style="width: 16%;">
-                    <col style="width: 16%;">
+                    <col style="width: 13%;">
+                    <col style="width: 13%;">
                     <col style="width: 7%;">
                     <col style="width: 5%;">
+                    <col style="width: 7%;">
                     <col style="width: 6%;">
-                    <col style="width: 25%;">
+                    <col style="width: 6%;">
+                    <col style="width: 19%;">
                     <col style="width: 5%;">
                     <col style="width: 5%;">
                     <col style="width: 5%;">
@@ -1419,6 +1458,8 @@ function exportPdf(rows, pidReportRows) {
                         <th>Project</th>
                         <th>Delivery Note#</th>
                         <th>DN #</th>
+                        <th>Destination</th>
+                        <th>Vehicle Type</th>
                         <th>Item No</th>
                         <th>ItemName</th>
                         <th>Qty</th>
@@ -1492,12 +1533,14 @@ function exportPdf(rows, pidReportRows) {
                 .delivery-col-note { width: 6.2%; }
                 .delivery-col-dn { width: 4.5%; }
                 .delivery-col-destination { width: 5.5%; }
+                .delivery-col-vehicle { width: 4.5%; }
                 .delivery-col-added { width: 5.5%; }
                 .delivery-col-weight { width: 5.8%; }
                 .delivery-col-mnfqty { width: 5%; }
                 .delivery-col-percent { width: 4.1%; }
                 .delivery-col-percent-wide { width: 5%; }
                 .delivery-col-total-delivered { width: 5.2%; }
+                .delivery-col-material { width: 5%; }
                 .delivery-col-remark { width: 5.7%; }
                 .delivery-print-table tfoot .footer-empty {
                     background: transparent;
