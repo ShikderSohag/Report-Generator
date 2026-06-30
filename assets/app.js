@@ -184,7 +184,7 @@ async function filesFromEntry(entry) {
 function requiredUploadFiles(files) {
     const supported = files.filter((file) => {
         const name = file.name.toLowerCase();
-        return /\.(xlsx|csv|pdf|zip)$/.test(name) || /^\d{8,}$/.test(name);
+        return /\.(xlsx|xlsm|csv|pdf|zip)$/.test(name) || /^\d{8,}$/.test(name);
     });
     const deliveryNotePdfs = supported.filter((file) => {
         return file.name.toLowerCase().endsWith('.pdf') && isDeliveryNoteFileName(file.name);

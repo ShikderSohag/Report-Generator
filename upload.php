@@ -4,6 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/db.php';
 require __DIR__ . '/xlsx_reader.php';
 require __DIR__ . '/pdf_reader.php';
+require __DIR__ . '/vehicle_importer.php';
 
 @set_time_limit(300);
 
@@ -131,8 +132,8 @@ function importUploadedFile(array $file, string $uploadDir): array
     $originalName = $file['name'];
     $extension = detectUploadExtension($file);
 
-    if (!in_array($extension, ['xlsx', 'csv', 'pdf', 'zip'], true)) {
-        throw new RuntimeException('The file type could not be recognized. Upload an Excel, CSV, PDF, or ZIP file.');
+    if (!in_array($extension, ['xlsx', 'xlsm', 'csv', 'pdf', 'zip'], true)) {
+        throw new RuntimeException('The file type could not be recognized. Upload an XLSX, XLSM, CSV, PDF, or ZIP file.');
     }
 
     $safeName = preg_replace('/[^A-Za-z0-9_.-]/', '_', $originalName);
@@ -153,8 +154,11 @@ function importUploadedFile(array $file, string $uploadDir): array
         return importPdf($targetPath);
     }
 
-    $rows = $extension === 'csv' ? readCsvRows($targetPath) : readXlsxRows($targetPath);
-    return importRows($rows);
+    if ($extension === 'csv') {
+        return importRows(readCsvRows($targetPath));
+    }
+
+    return importExcelFile($targetPath, $originalName);
 }
 
 function uploadErrorMessage(int $error): string
@@ -174,7 +178,7 @@ function uploadErrorMessage(int $error): string
 function detectUploadExtension(array $file): string
 {
     $extension = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
-    if (in_array($extension, ['xlsx', 'csv', 'pdf', 'zip'], true)) {
+    if (in_array($extension, ['xlsx', 'xlsm', 'csv', 'pdf', 'zip'], true)) {
         return $extension;
     }
 
@@ -271,8 +275,9 @@ function importZip(string $path, string $uploadDir): array
             if ($entry['extension'] === 'pdf') {
                 $result = importPdf($targetPath);
             } else {
-                $rows = $entry['extension'] === 'csv' ? readCsvRows($targetPath) : readXlsxRows($targetPath);
-                $result = importRows($rows);
+                $result = $entry['extension'] === 'csv'
+                    ? importRows(readCsvRows($targetPath))
+                    : importExcelFile($targetPath, $entry['base']);
             }
 
             $summary['inserted'] += $result['inserted'];
@@ -312,7 +317,7 @@ function zipImportEntries(ZipArchive $zip): array
         }
 
         $extension = strtolower(pathinfo($baseName, PATHINFO_EXTENSION));
-        if (!in_array($extension, ['xlsx', 'csv', 'pdf'], true)) {
+        if (!in_array($extension, ['xlsx', 'xlsm', 'csv', 'pdf'], true)) {
             continue;
         }
 
@@ -337,6 +342,19 @@ function zipImportEntries(ZipArchive $zip): array
     }
 
     return $entries;
+}
+
+function importExcelFile(string $path, string $sourceFile): array
+{
+    try {
+        return importVehicleWorkbook(db(), $path, $sourceFile);
+    } catch (RuntimeException $exception) {
+        if ($exception->getMessage() !== 'No worksheet with Work Orders and Trucks columns was found.') {
+            throw $exception;
+        }
+    }
+
+    return importRows(readXlsxRows($path));
 }
 
 function isDeliveryNotePdfName(string $fileName): bool

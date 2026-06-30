@@ -40,3 +40,11 @@ CREATE TABLE IF NOT EXISTS work_order_deliveries (
     UNIQUE KEY uq_work_order_deliveries_wo_dn (wo_no, dn_number),
     KEY idx_work_order_deliveries_wo_no (wo_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS work_order_vehicle_types (
+    wo_no VARCHAR(80) NOT NULL PRIMARY KEY,
+    vehicle_type VARCHAR(120) NOT NULL,
+    source_file VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

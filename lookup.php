@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/db.php';
+require __DIR__ . '/vehicle_schema.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -16,8 +17,10 @@ if ($woNo === '') {
 try {
     $pdo = db();
     ensureSchema($pdo);
+    ensureWorkOrderVehicleSchema($pdo);
 
     $lookupValues = workOrderLookupValues($woNo);
+    $scheduledVehicle = lookupScheduledVehicle($pdo, $lookupValues, $woNo);
     $statement = $pdo->prepare('
         SELECT wo_no, customer_name, project_name, dn_number, destination, edd, wo_qty, duct_weight, mnf_weight,
                fix_anc_weight, duct_system, pid_area, pid_supp_rod, pid_mnf_qty, pid_material, raw_data
@@ -42,7 +45,7 @@ try {
             $row['duct_weight'] = $workOrderRaw['ductweight'];
         }
     }
-    $row['vehicle_type'] = lookupVehicleType($workOrderRaw);
+    $row['vehicle_type'] = $scheduledVehicle ?: lookupVehicleType($workOrderRaw);
     $row['material'] = lookupMetalMaterial($workOrderRaw);
     unset($row['raw_data']);
 
@@ -58,7 +61,7 @@ try {
         $deliveryRaw = json_decode((string) ($delivery['raw_data'] ?? ''), true);
         $deliveryRaw = is_array($deliveryRaw) ? $deliveryRaw : [];
         $metadata = array_replace($workOrderRaw, $deliveryRaw);
-        $delivery['vehicle_type'] = lookupVehicleType($metadata);
+        $delivery['vehicle_type'] = $scheduledVehicle ?: lookupVehicleType($metadata);
         $delivery['material'] = lookupMetalMaterial($metadata);
         unset($delivery['raw_data']);
     }
@@ -96,6 +99,24 @@ try {
 } catch (Throwable $exception) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => $exception->getMessage()]);
+}
+
+function lookupScheduledVehicle(PDO $pdo, array $lookupValues, string $canonicalWorkOrder): ?string
+{
+    if (!$lookupValues) {
+        return null;
+    }
+
+    $statement = $pdo->prepare('
+        SELECT vehicle_type
+        FROM work_order_vehicle_types
+        WHERE wo_no IN (' . implode(',', array_fill(0, count($lookupValues), '?')) . ')
+        ORDER BY CASE WHEN wo_no = ? THEN 0 ELSE 1 END
+        LIMIT 1
+    ');
+    $statement->execute([...$lookupValues, $canonicalWorkOrder]);
+    $vehicle = trim((string) ($statement->fetchColumn() ?: ''));
+    return $vehicle === '' ? null : $vehicle;
 }
 
 function withPreviousDeliveryTotals(array $deliveries): array

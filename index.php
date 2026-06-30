@@ -42,14 +42,14 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
         <section id="upload" class="panel">
             <div class="section-head">
                 <h2>Upload Source File</h2>
-                <p>Upload Excel/CSV work orders, delivery-note PDFs, or ZIP files containing them.</p>
+                <p>Upload Excel/CSV work orders, vehicle schedules, delivery-note PDFs, or ZIP files containing them.</p>
             </div>
 
             <form id="uploadForm" class="upload-form" action="upload.php" method="post" enctype="multipart/form-data">
                 <label class="drop-zone" for="excel_file">
-                    <input id="excel_file" name="excel_file[]" type="file" accept=".xlsx,.csv,.pdf,.zip" multiple>
+                    <input id="excel_file" name="excel_file[]" type="file" accept=".xlsx,.xlsm,.csv,.pdf,.zip" multiple>
                     <span class="drop-title">Drop files or a folder here</span>
-                    <span class="drop-subtitle">Supported formats: .xlsx, .csv, .pdf, .zip (up to 128 MB per file)</span>
+                    <span class="drop-subtitle">Supported formats: .xlsx, .xlsm, .csv, .pdf, .zip (up to 128 MB per file)</span>
                     <span id="fileName" class="file-name"></span>
                 </label>
                 <button type="submit">Upload and Import</button>

@@ -25,9 +25,35 @@ function readXlsxRows(string $path): array
     }
 
     $sharedStrings = readSharedStrings($zip);
-    $sheetPath = firstWorksheetPath($zip);
-    $sheetXml = $zip->getFromName($sheetPath);
+    $worksheets = worksheetPaths($zip);
+    $sheetPath = $worksheets ? reset($worksheets) : 'xl/worksheets/sheet1.xml';
+    $rows = readWorksheetRows($zip, $sheetPath, $sharedStrings);
     $zip->close();
+
+    return $rows;
+}
+
+function readAllXlsxWorksheets(string $path): array
+{
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) {
+        throw new RuntimeException('Could not open Excel workbook.');
+    }
+
+    $sharedStrings = readSharedStrings($zip);
+    $worksheets = worksheetPaths($zip);
+    $result = [];
+    foreach ($worksheets as $name => $sheetPath) {
+        $result[$name] = readWorksheetRows($zip, $sheetPath, $sharedStrings);
+    }
+    $zip->close();
+
+    return $result;
+}
+
+function readWorksheetRows(ZipArchive $zip, string $sheetPath, array $sharedStrings): array
+{
+    $sheetXml = $zip->getFromName($sheetPath);
 
     if ($sheetXml === false) {
         throw new RuntimeException('Could not read worksheet XML.');
@@ -87,37 +113,48 @@ function readSharedStrings(ZipArchive $zip): array
 
 function firstWorksheetPath(ZipArchive $zip): string
 {
+    $worksheets = worksheetPaths($zip);
+    return $worksheets ? (string) reset($worksheets) : 'xl/worksheets/sheet1.xml';
+}
+
+function worksheetPaths(ZipArchive $zip): array
+{
     $workbookXml = $zip->getFromName('xl/workbook.xml');
     $relsXml = $zip->getFromName('xl/_rels/workbook.xml.rels');
 
     if ($workbookXml === false || $relsXml === false) {
-        return 'xl/worksheets/sheet1.xml';
+        return ['Sheet1' => 'xl/worksheets/sheet1.xml'];
     }
 
     $workbook = simplexml_load_string($workbookXml);
     $rels = simplexml_load_string($relsXml);
 
     if (!$workbook || !$rels) {
-        return 'xl/worksheets/sheet1.xml';
+        return ['Sheet1' => 'xl/worksheets/sheet1.xml'];
     }
 
-    $workbook->registerXPathNamespace('rel', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships');
-    $sheets = $workbook->xpath('//rel:sheet');
-
-    if (!$sheets || !isset($sheets[0])) {
-        return 'xl/worksheets/sheet1.xml';
+    $relationshipNamespace = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    $workbook->registerXPathNamespace('main', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+    $rels->registerXPathNamespace('pkg', 'http://schemas.openxmlformats.org/package/2006/relationships');
+    $relationshipTargets = [];
+    foreach ($rels->xpath('//pkg:Relationship') ?: [] as $relationship) {
+        $relationshipTargets[(string) $relationship['Id']] = (string) $relationship['Target'];
     }
 
-    $relationId = (string) $sheets[0]->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships')['id'];
-
-    foreach ($rels->Relationship as $relationship) {
-        if ((string) $relationship['Id'] === $relationId) {
-            $target = (string) $relationship['Target'];
-            return str_starts_with($target, 'xl/') ? $target : 'xl/' . $target;
+    $paths = [];
+    foreach ($workbook->xpath('//main:sheets/main:sheet') ?: [] as $sheet) {
+        $name = (string) $sheet['name'];
+        $relationId = (string) $sheet->attributes($relationshipNamespace)['id'];
+        $target = $relationshipTargets[$relationId] ?? '';
+        if ($name === '' || $target === '') {
+            continue;
         }
+
+        $target = ltrim($target, '/');
+        $paths[$name] = str_starts_with($target, 'xl/') ? $target : 'xl/' . $target;
     }
 
-    return 'xl/worksheets/sheet1.xml';
+    return $paths ?: ['Sheet1' => 'xl/worksheets/sheet1.xml'];
 }
 
 function cellValue(SimpleXMLElement $cell, array $sharedStrings): ?string

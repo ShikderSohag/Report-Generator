@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/db.php';
+require __DIR__ . '/vehicle_schema.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -16,6 +17,7 @@ if ($reportDate === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $reportDate)) {
 try {
     $pdo = db();
     ensureSchema($pdo);
+    ensureWorkOrderVehicleSchema($pdo);
 
     $statement = $pdo->query("
         SELECT
@@ -39,9 +41,11 @@ try {
             w.project_name AS work_order_project_name,
             w.destination,
             w.duct_weight AS work_order_duct_weight,
-            w.raw_data AS work_order_raw_data
+            w.raw_data AS work_order_raw_data,
+            v.vehicle_type AS scheduled_vehicle_type
         FROM work_order_deliveries d
         LEFT JOIN work_orders w ON w.wo_no = d.wo_no
+        LEFT JOIN work_order_vehicle_types v ON v.wo_no = d.wo_no
         ORDER BY d.wo_no ASC, d.dn_number ASC, d.id ASC
     ");
 
@@ -108,7 +112,7 @@ function deliveryPayload(array $row): array
             'project_name' => $row['delivery_project_name'] ?: ($row['work_order_project_name'] ?? null),
             'dn_number' => $row['dn_number'] ?? null,
             'destination' => $row['destination'] ?? null,
-            'vehicle_type' => deliveryVehicleType($raw),
+            'vehicle_type' => $row['scheduled_vehicle_type'] ?: deliveryVehicleType($raw),
             'added_to_delivery' => 'Yes',
             'duct_system' => 'pid',
             'pid_area' => nullablePayloadNumber($row['pid_area'] ?? $row['mnf_weight'] ?? null),
@@ -134,7 +138,7 @@ function deliveryPayload(array $row): array
         'project_name' => $row['delivery_project_name'] ?: ($row['work_order_project_name'] ?? null),
         'dn_number' => $row['dn_number'] ?? null,
         'destination' => $row['destination'] ?? null,
-        'vehicle_type' => deliveryVehicleType($raw),
+        'vehicle_type' => $row['scheduled_vehicle_type'] ?: deliveryVehicleType($raw),
         'added_to_delivery' => 'Yes',
         'duct_system' => 'metal',
         'duct_weight' => $workOrderWeight,
