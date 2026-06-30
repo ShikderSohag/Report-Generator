@@ -108,7 +108,8 @@ def parse_metal_material(text):
         flags=IGNORECASE,
     )
     material_text = " ".join(material_values)
-    searchable = f"{material_text} {text if re.search(r'double\s+wall', text, IGNORECASE) else ''}"
+    double_wall_text = text if re.search(r"double\s+wall", text, IGNORECASE) else ""
+    searchable = f"{material_text} {double_wall_text}"
     duct_type = "DW" if re.search(r"\bdouble\s+wall\b|\bDW\b", searchable, flags=IGNORECASE) else "SW"
     materials = []
 
