@@ -112,26 +112,26 @@ def parse_metal_material(text):
         flags=IGNORECASE,
     )
     material_text = " ".join(material_values)
-    double_wall_text = text if re.search(r"double\s+wall", text, IGNORECASE) else ""
+    double_wall_text = text if re.search(r"double\s*wall", text, IGNORECASE) else ""
     searchable = f"{material_text} {double_wall_text}"
-    duct_type = "DW" if re.search(r"\bdouble\s+wall\b|\bDW\b", searchable, flags=IGNORECASE) else "SW"
+    duct_type = "DW" if re.search(r"\bdouble\s*wall\b|\bDW\b", searchable, flags=IGNORECASE) else "SW"
     materials = []
 
     def add(code):
         if code not in materials:
             materials.append(code)
 
-    if re.search(r"(?:stainless\s+steel|\bSS\b)[^\r\n]{0,20}\b304\b|\b304\b[^\r\n]{0,20}(?:stainless\s+steel|\bSS\b)", searchable, flags=IGNORECASE):
+    if re.search(r"(?:stainless\s*steel|\bSS\b)[^\r\n]{0,20}\b304\b|\b304\b[^\r\n]{0,20}(?:stainless\s*steel|\bSS\b)", searchable, flags=IGNORECASE):
         add("SS 304")
-    if re.search(r"(?:stainless\s+steel|\bSS\b)[^\r\n]{0,20}\b316\b|\b316\b[^\r\n]{0,20}(?:stainless\s+steel|\bSS\b)", searchable, flags=IGNORECASE):
+    if re.search(r"(?:stainless\s*steel|\bSS\b)[^\r\n]{0,20}\b316\b|\b316\b[^\r\n]{0,20}(?:stainless\s*steel|\bSS\b)", searchable, flags=IGNORECASE):
         add("SS 316")
     if re.search(r"\bgalvani[sz]ed\b|\bGI\b", searchable, flags=IGNORECASE):
         add("GI")
     if re.search(r"\balumini?um\b", searchable, flags=IGNORECASE):
         add("AL")
-    if re.search(r"\bblack\s+steel\b", searchable, flags=IGNORECASE):
+    if re.search(r"\bblack\s*steel\b", searchable, flags=IGNORECASE):
         add("BS")
-    if re.search(r"\bmild\s+steel\b", searchable, flags=IGNORECASE):
+    if re.search(r"\bmild\s*steel\b", searchable, flags=IGNORECASE):
         add("MS")
 
     if materials:

@@ -187,15 +187,15 @@ function shortMetalMaterial(?string $value, bool $allowOriginal = true): ?string
         return null;
     }
 
-    $ductType = preg_match('/\bDOUBLE\s+WALL\b|\bDW\b/i', $value) ? 'DW' : 'SW';
+    $ductType = preg_match('/\bDOUBLE\s*WALL\b|\bDW\b/i', $value) ? 'DW' : 'SW';
     $materials = [];
     $patterns = [
-        'SS 304' => '/(?:STAINLESS\s+STEEL|\bSS\b).*\b304\b|\b304\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i',
-        'SS 316' => '/(?:STAINLESS\s+STEEL|\bSS\b).*\b316\b|\b316\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i',
+        'SS 304' => '/(?:STAINLESS\s*STEEL|\bSS\b).*\b304\b|\b304\b.*(?:STAINLESS\s*STEEL|\bSS\b)/i',
+        'SS 316' => '/(?:STAINLESS\s*STEEL|\bSS\b).*\b316\b|\b316\b.*(?:STAINLESS\s*STEEL|\bSS\b)/i',
         'GI' => '/\bGALVANI[ZS]ED\b|\bGI\b/i',
         'AL' => '/\bALUMINI?UM\b/i',
-        'BS' => '/\bBLACK\s+STEEL\b/i',
-        'MS' => '/\bMILD\s+STEEL\b/i',
+        'BS' => '/\bBLACK\s*STEEL\b/i',
+        'MS' => '/\bMILD\s*STEEL\b/i',
     ];
     foreach ($patterns as $code => $pattern) {
         if (preg_match($pattern, $value)) {

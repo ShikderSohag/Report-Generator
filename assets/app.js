@@ -1704,7 +1704,7 @@ function normalizeMetalDuctMaterial(value) {
         return '';
     }
 
-    const ductType = /\bDOUBLE\s+WALL\b|\bDW\b/i.test(value) ? 'DW' : 'SW';
+    const ductType = /\bDOUBLE\s*WALL\b|\bDW\b/i.test(value) ? 'DW' : 'SW';
     const materials = [];
     const add = (code) => {
         if (!materials.includes(code)) {
@@ -1712,12 +1712,12 @@ function normalizeMetalDuctMaterial(value) {
         }
     };
 
-    if (/(?:STAINLESS\s+STEEL|\bSS\b).*\b304\b|\b304\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i.test(value)) add('SS 304');
-    if (/(?:STAINLESS\s+STEEL|\bSS\b).*\b316\b|\b316\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i.test(value)) add('SS 316');
+    if (/(?:STAINLESS\s*STEEL|\bSS\b).*\b304\b|\b304\b.*(?:STAINLESS\s*STEEL|\bSS\b)/i.test(value)) add('SS 304');
+    if (/(?:STAINLESS\s*STEEL|\bSS\b).*\b316\b|\b316\b.*(?:STAINLESS\s*STEEL|\bSS\b)/i.test(value)) add('SS 316');
     if (/\bGALVANI[ZS]ED\b|\bGI\b/i.test(value)) add('GI');
     if (/\bALUMINI?UM\b|\bAL\b/i.test(value)) add('AL');
-    if (/\bBLACK\s+STEEL\b|\bBS\b/i.test(value)) add('BS');
-    if (/\bMILD\s+STEEL\b|\bMS\b/i.test(value)) add('MS');
+    if (/\bBLACK\s*STEEL\b|\bBS\b/i.test(value)) add('BS');
+    if (/\bMILD\s*STEEL\b|\bMS\b/i.test(value)) add('MS');
 
     if (materials.length) {
         return `${ductType}/${materials.join('+')}`;
