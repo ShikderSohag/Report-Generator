@@ -113,14 +113,13 @@ def parse_metal_material(text):
     )
     material_text = " ".join(material_values)
     searchable = f"{material_text} {text if re.search(r'double\s+wall', text, IGNORECASE) else ''}"
-    codes = []
+    duct_type = "DW" if re.search(r"\bdouble\s+wall\b|\bDW\b", searchable, flags=IGNORECASE) else "SW"
+    materials = []
 
     def add(code):
-        if code not in codes:
-            codes.append(code)
+        if code not in materials:
+            materials.append(code)
 
-    if re.search(r"\bdouble\s+wall\b|\bDW\b", searchable, flags=IGNORECASE):
-        add("DW")
     if re.search(r"(?:stainless\s+steel|\bSS\b)[^\r\n]{0,20}\b304\b|\b304\b[^\r\n]{0,20}(?:stainless\s+steel|\bSS\b)", searchable, flags=IGNORECASE):
         add("SS 304")
     if re.search(r"(?:stainless\s+steel|\bSS\b)[^\r\n]{0,20}\b316\b|\b316\b[^\r\n]{0,20}(?:stainless\s+steel|\bSS\b)", searchable, flags=IGNORECASE):
@@ -134,15 +133,19 @@ def parse_metal_material(text):
     if re.search(r"\bmild\s+steel\b", searchable, flags=IGNORECASE):
         add("MS")
 
-    if codes:
-        return " / ".join(codes)
+    if materials:
+        return f"{duct_type}/{' + '.join(materials)}"
 
     if material_values:
         value = re.sub(r"\s+x\s+\d+\s*$", "", material_values[0], flags=IGNORECASE)
-        return re.sub(r"\s+", " ", value).strip() or None
+        value = re.sub(r"\s+", " ", value).strip()
+        return f"{duct_type}/{value}" if value else duct_type
 
     service_type = first_match(r"Service\s+Type\s*:\s*([^,\r\n]+)", text, flags=IGNORECASE)
-    return re.sub(r"\s+", " ", service_type).strip() if service_type else None
+    if service_type:
+        service_type = re.sub(r"\s+", " ", service_type).strip()
+        return f"{duct_type}/{service_type}"
+    return duct_type if duct_type == "DW" else None
 
 
 def parse_dn_number(zone):

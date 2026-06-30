@@ -187,9 +187,9 @@ function shortMetalMaterial(?string $value, bool $allowOriginal = true): ?string
         return null;
     }
 
-    $codes = [];
+    $ductType = preg_match('/\bDOUBLE\s+WALL\b|\bDW\b/i', $value) ? 'DW' : 'SW';
+    $materials = [];
     $patterns = [
-        'DW' => '/\bDOUBLE\s+WALL\b|\bDW\b/i',
         'SS 304' => '/(?:STAINLESS\s+STEEL|\bSS\b).*\b304\b|\b304\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i',
         'SS 316' => '/(?:STAINLESS\s+STEEL|\bSS\b).*\b316\b|\b316\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i',
         'GI' => '/\bGALVANI[ZS]ED\b|\bGI\b/i',
@@ -199,11 +199,24 @@ function shortMetalMaterial(?string $value, bool $allowOriginal = true): ?string
     ];
     foreach ($patterns as $code => $pattern) {
         if (preg_match($pattern, $value)) {
-            $codes[] = $code;
+            $materials[] = $code;
         }
     }
 
-    return $codes ? implode(' / ', $codes) : ($allowOriginal ? $value : null);
+    if ($materials) {
+        return $ductType . '/' . implode('+', $materials);
+    }
+    if (!$allowOriginal) {
+        return $ductType === 'DW' ? 'DW' : null;
+    }
+
+    if (preg_match('/^(SW|DW)\s*\/\s*(.+)$/i', $value, $matches)) {
+        return strtoupper($matches[1]) . '/' . trim($matches[2]);
+    }
+    if (preg_match('/^(SW|DW)$/i', $value, $matches)) {
+        return strtoupper($matches[1]);
+    }
+    return $ductType . '/' . $value;
 }
 
 function deliveryMatchesReportDate(array $row, string $reportDate): bool

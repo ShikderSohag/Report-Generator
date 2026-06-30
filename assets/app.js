@@ -481,6 +481,7 @@ function addReportRow(data) {
     const row = document.createElement('tr');
     const mnfWeight = numberValue(data.mnf_weight);
     const fixAncWeight = numberValue(data.fix_anc_weight);
+    const metalMaterial = normalizeMetalDuctMaterial(data.material || data.metal_material || '');
     const hasPreviousPercentOverride = data.previous_delivered_percent !== undefined
         && data.previous_delivered_percent !== null;
     row.dataset.woNo = normalizedWoNo || rowKey;
@@ -514,7 +515,7 @@ function addReportRow(data) {
         <td class="shipment-percent">0%</td>
         <td><div class="percent-input"><input class="cell-input number manual-prev" type="text" inputmode="decimal" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
         <td class="delivered-total">0%</td>
-        <td><input class="cell-input short" type="text" placeholder="Material" value="${escapeHtml(data.material || data.metal_material || '')}"></td>
+        <td><input class="cell-input short metal-material-input" type="text" placeholder="SW/GI" value="${escapeHtml(metalMaterial)}"></td>
         <td><textarea class="cell-input remark" rows="2" placeholder="Remark">${escapeHtml(data.remark || '')}</textarea></td>
         <td><button class="remove-row" type="button">Remove</button></td>
     `;
@@ -545,6 +546,10 @@ function addReportRow(data) {
     });
     previousPercentInput.addEventListener('change', () => {
         roundPreviousPercentInput(row, previousPercentInput, updateCumulativePercentages);
+    });
+
+    row.querySelector('.metal-material-input').addEventListener('change', (event) => {
+        event.target.value = normalizeMetalDuctMaterial(event.target.value);
     });
 
     row.querySelector('.remove-row').addEventListener('click', () => {
@@ -1691,6 +1696,41 @@ function formatPercent(value) {
 
 function roundedPercent(value) {
     return Math.round(numberValue(value));
+}
+
+function normalizeMetalDuctMaterial(value) {
+    value = String(value || '').trim();
+    if (!value) {
+        return '';
+    }
+
+    const ductType = /\bDOUBLE\s+WALL\b|\bDW\b/i.test(value) ? 'DW' : 'SW';
+    const materials = [];
+    const add = (code) => {
+        if (!materials.includes(code)) {
+            materials.push(code);
+        }
+    };
+
+    if (/(?:STAINLESS\s+STEEL|\bSS\b).*\b304\b|\b304\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i.test(value)) add('SS 304');
+    if (/(?:STAINLESS\s+STEEL|\bSS\b).*\b316\b|\b316\b.*(?:STAINLESS\s+STEEL|\bSS\b)/i.test(value)) add('SS 316');
+    if (/\bGALVANI[ZS]ED\b|\bGI\b/i.test(value)) add('GI');
+    if (/\bALUMINI?UM\b|\bAL\b/i.test(value)) add('AL');
+    if (/\bBLACK\s+STEEL\b|\bBS\b/i.test(value)) add('BS');
+    if (/\bMILD\s+STEEL\b|\bMS\b/i.test(value)) add('MS');
+
+    if (materials.length) {
+        return `${ductType}/${materials.join('+')}`;
+    }
+
+    const formatted = value.match(/^(SW|DW)\s*\/\s*(.+)$/i);
+    if (formatted) {
+        return `${formatted[1].toUpperCase()}/${formatted[2].trim()}`;
+    }
+    if (/^(SW|DW)$/i.test(value)) {
+        return value.toUpperCase();
+    }
+    return `${ductType}/${value}`;
 }
 
 function roundPreviousPercentInput(row, input, recalculate) {
