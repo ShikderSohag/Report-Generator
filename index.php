@@ -73,8 +73,6 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
             <div class="report-actions">
                 <input id="currentReportId" type="hidden" value="">
                 <button id="autoloadDeliveryNotes" type="button">Load Delivery Notes</button>
-                <button id="addManualMetalRow" type="button">Add Manual Metal Row</button>
-                <button id="addManualPidRow" type="button">Add Manual PID Row</button>
                 <button id="saveReport" type="button">Save Report</button>
                 <button id="exportReport" type="button">Export PDF</button>
                 <button id="exportExcel" type="button">Export Excel</button>
@@ -148,6 +146,12 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                         </tr>
                     </tbody>
                     <tfoot>
+                        <tr class="add-row-footer">
+                            <td class="add-row-cell">
+                                <button id="addManualMetalRow" class="add-row-icon" type="button" aria-label="Add manual Metal row" title="Add manual Metal row"><span aria-hidden="true">+</span></button>
+                            </td>
+                            <td colspan="16" class="footer-blank"></td>
+                        </tr>
                         <tr>
                             <td colspan="5" class="footer-blank"></td>
                             <td colspan="2" class="grand-label">Grand Totals:</td>
@@ -219,6 +223,12 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                             </tr>
                         </tbody>
                         <tfoot>
+                            <tr class="add-row-footer">
+                                <td class="add-row-cell">
+                                    <button id="addManualPidRow" class="add-row-icon" type="button" aria-label="Add manual PID row" title="Add manual PID row"><span aria-hidden="true">+</span></button>
+                                </td>
+                                <td colspan="16" class="footer-blank"></td>
+                            </tr>
                             <tr>
                                 <td colspan="4" class="footer-blank"></td>
                                 <td colspan="2" class="grand-label">Grand Totals:</td>

@@ -530,6 +530,26 @@ input[readonly] {
     text-align: right;
 }
 
+.report-table tfoot .add-row-cell {
+    background: transparent;
+    border: 0;
+    padding: 4px;
+    text-align: center;
+}
+
+.add-row-icon {
+    align-items: center;
+    border-radius: 4px;
+    display: inline-flex;
+    font-size: 20px;
+    height: 26px;
+    justify-content: center;
+    line-height: 1;
+    min-height: 26px;
+    padding: 0;
+    width: 26px;
+}
+
 .manual-table-section {
     margin-top: 22px;
 }
