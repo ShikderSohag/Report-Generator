@@ -45,6 +45,16 @@ def number(value):
 
 
 def parse_totals(text):
+    grand_sections = re.split(r"Grand\s+Totals\s*:", text, maxsplit=1, flags=IGNORECASE)
+    if len(grand_sections) == 2:
+        for line in grand_sections[1].splitlines()[:6]:
+            match = re.fullmatch(
+                r"\s*(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*",
+                line,
+            )
+            if match:
+                return tuple(number(value) for value in match.groups())
+
     total_qty = 0.0
     total_area = 0.0
     total_weight = 0.0
@@ -112,9 +122,12 @@ def parse_metal_material(text):
         flags=IGNORECASE,
     )
     material_text = " ".join(material_values)
-    double_wall_text = text if re.search(r"double\s*wall", text, IGNORECASE) else ""
-    searchable = f"{material_text} {double_wall_text}"
-    duct_type = "DW" if re.search(r"\bdouble\s*wall\b|\bDW\b", searchable, flags=IGNORECASE) else "SW"
+    is_double_wall = bool(
+        re.search(r"Double\s*Wall\s*:\s*(?:Yes|Y|True)\b", text, flags=IGNORECASE)
+        or re.search(r"\bdouble\s*wall\b|\bDW\b", material_text, flags=IGNORECASE)
+    )
+    searchable = material_text + " " + text
+    duct_type = "DW" if is_double_wall else "SW"
     materials = []
 
     def add(code):
@@ -334,7 +347,7 @@ def main():
         "fixancweight": fixed_weight,
         "metalmaterial": parse_metal_material(text),
         "vehicletype": parse_vehicle_type(text),
-        "pdfdate": first_match(r"Page:\s*\d+/\d+\s+Date:\s*([0-9/]+)", text),
+        "pdfdate": first_match(r"Date:\s*([0-9/]+)", text),
         "raw_text": text,
     }
 
