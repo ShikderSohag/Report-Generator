@@ -49,7 +49,7 @@ function readPdfDeliveryNote(string $path): array
         }
 
         if (empty($data['wono'])) {
-            throw new RuntimeException('Could not find a delivery note / WO number in the PDF.');
+            throw new RuntimeException(unidentifiedPdfMessage($data));
         }
 
         return $data;
@@ -59,6 +59,43 @@ function readPdfDeliveryNote(string $path): array
         "Could not extract PDF data. Configure \$pythonPath in db.php to a Python that has pdfplumber, pypdf, or PyPDF2 installed. Details: "
         . implode("\n---\n", array_filter($errors))
     );
+}
+
+function unidentifiedPdfMessage(array $data): string
+{
+    $details = [];
+    $labels = [
+        'dnnumber' => 'DN',
+        'customer' => 'Customer',
+        'projectname' => 'Project',
+        'zone' => 'Zone',
+        'pdfdate' => 'Date',
+    ];
+
+    foreach ($labels as $key => $label) {
+        $value = trim((string) ($data[$key] ?? ''));
+        if ($value !== '') {
+            $details[] = $label . ': ' . preg_replace('/\s+/', ' ', $value);
+        }
+    }
+
+    $possibleNumbers = [];
+    $rawText = (string) ($data['raw_text'] ?? '');
+    if (preg_match_all('/\bW?\d{8,}\b/i', $rawText, $matches)) {
+        $possibleNumbers = array_slice(array_values(array_unique($matches[0])), 0, 5);
+    }
+    if ($possibleNumbers) {
+        $details[] = 'Possible WO number(s): ' . implode(', ', $possibleNumbers);
+    }
+
+    $message = 'The PDF was read, but its delivery note / WO number was not recognized.';
+    if ($details) {
+        $message .= ' Identified details - ' . implode('; ', $details) . '.';
+    } else {
+        $message .= ' No customer, project, DN, date, or WO candidate could be extracted.';
+    }
+
+    return $message;
 }
 
 function pdfPythonCandidates(): array

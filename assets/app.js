@@ -114,7 +114,12 @@ if (uploadForm && fileInput && fileName && uploadResult) {
 
                 completed += 1;
             } catch (error) {
-                failures.push(`${file.name}: ${error.message || 'Upload failed.'}`);
+                const reason = String(error.message || 'Upload failed.')
+                    .replace(/^Import failed:\s*/i, '')
+                    .trim();
+                failures.push(reason.toLowerCase().startsWith(`${file.name.toLowerCase()}:`)
+                    ? reason
+                    : `${file.name}: ${reason}`);
             }
         }
 

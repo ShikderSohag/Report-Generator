@@ -284,6 +284,7 @@ def main():
 
     project_name = first_match(r"^Project:\s*(.+)$", text)
     zone_line = first_match(r"^Zone/Area/Floor:\s*(.+)$", text)
+    customer = first_match(r"^Customer:\s*(.+)$", text)
     delivery_note = None
     zone = zone_line
 
@@ -292,6 +293,18 @@ def main():
         if match:
             zone = match.group(1).strip()
             delivery_note = match.group(2).strip()
+
+    if not delivery_note and customer:
+        match = re.search(r"(.+?)\s+(W?\d{8,})\s*$", customer, flags=re.IGNORECASE)
+        if match:
+            customer = match.group(1).strip()
+            delivery_note = match.group(2).strip()
+
+    if not delivery_note:
+        header_text = re.split(r"(?:Item\s+Description|>:\s*(?:Straights|Fittings))", text, maxsplit=1, flags=re.IGNORECASE)[0]
+        candidates = list(dict.fromkeys(re.findall(r"(?<!\d)(W?\d{8,})(?!\d)", header_text, flags=re.IGNORECASE)))
+        if len(candidates) == 1:
+            delivery_note = candidates[0]
     dn_number = parse_dn_number(zone) or parse_dn_number(project_name)
 
     title = first_match(r"^(Delivery Note \(.+?\))", text)
@@ -304,7 +317,7 @@ def main():
         "duct_system": "metal",
         "pdf_type": "fixed" if is_fixed else "manufactured",
         "pages": pages,
-        "customer": first_match(r"^Customer:\s*(.+)$", text),
+        "customer": customer,
         "projectname": project_name,
         "zone": zone,
         "dnnumber": dn_number,
