@@ -49,7 +49,7 @@ $defaultReportDate = date('Y-m-d', strtotime('-1 day'));
                 <label class="drop-zone" for="excel_file">
                     <input id="excel_file" name="excel_file[]" type="file" accept=".xlsx,.xlsm,.csv,.pdf,.zip" multiple>
                     <span class="drop-title">Drop files or a folder here</span>
-                    <span class="drop-subtitle">Supported formats: .xlsx, .xlsm, .csv, .pdf, .zip (up to 128 MB per file)</span>
+                    <span class="drop-subtitle">Supported formats: .xlsx, .xlsm, .csv, .pdf, .zip (up to 50 MB per file)</span>
                     <span id="fileName" class="file-name"></span>
                 </label>
                 <button type="submit">Upload and Import</button>

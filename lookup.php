@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/db.php';
 require __DIR__ . '/vehicle_schema.php';
+require __DIR__ . '/delivery_note_schema.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -18,6 +19,7 @@ try {
     $pdo = db();
     ensureSchema($pdo);
     ensureWorkOrderVehicleSchema($pdo);
+    ensureDeliveryNoteQuantitySchema($pdo);
 
     $lookupValues = workOrderLookupValues($woNo);
     $scheduledVehicle = lookupScheduledVehicle($pdo, $lookupValues, $woNo);
@@ -50,7 +52,7 @@ try {
     unset($row['raw_data']);
 
     $deliveriesStatement = $pdo->prepare('
-        SELECT dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date,
+        SELECT dn_number, project_name, edd, wo_qty, mnf_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date,
                duct_system, pid_area, pid_supp_rod, pid_mnf_qty, pid_material, raw_data
         FROM work_order_deliveries
         WHERE wo_no IN (' . implode(',', array_fill(0, count($lookupValues), '?')) . ')
@@ -61,6 +63,7 @@ try {
         $deliveryRaw = json_decode((string) ($delivery['raw_data'] ?? ''), true);
         $deliveryRaw = is_array($deliveryRaw) ? $deliveryRaw : [];
         $metadata = array_replace($workOrderRaw, $deliveryRaw);
+        $delivery['mnf_qty'] = $delivery['mnf_qty'] ?? $delivery['wo_qty'];
         $delivery['vehicle_type'] = $scheduledVehicle ?: lookupVehicleType($metadata);
         $delivery['material'] = lookupMetalMaterial($metadata);
         unset($delivery['raw_data']);
@@ -74,6 +77,7 @@ try {
             'project_name' => $row['project_name'],
             'edd' => $row['edd'],
             'wo_qty' => $row['wo_qty'],
+            'mnf_qty' => $row['wo_qty'],
             'duct_weight' => $row['duct_weight'],
             'mnf_weight' => $row['mnf_weight'],
             'mnf_date' => null,

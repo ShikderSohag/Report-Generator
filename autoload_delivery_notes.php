@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/db.php';
 require __DIR__ . '/vehicle_schema.php';
+require __DIR__ . '/delivery_note_schema.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -18,6 +19,7 @@ try {
     $pdo = db();
     ensureSchema($pdo);
     ensureWorkOrderVehicleSchema($pdo);
+    ensureDeliveryNoteQuantitySchema($pdo);
 
     $statement = $pdo->query("
         SELECT
@@ -26,6 +28,7 @@ try {
             d.project_name AS delivery_project_name,
             d.edd,
             d.wo_qty AS delivery_wo_qty,
+            d.mnf_qty AS delivery_mnf_qty,
             d.duct_weight AS delivery_duct_weight,
             d.mnf_weight,
             d.mnf_date,
@@ -142,7 +145,8 @@ function deliveryPayload(array $row): array
         'added_to_delivery' => 'Yes',
         'duct_system' => 'metal',
         'duct_weight' => $workOrderWeight,
-        'wo_qty' => nullablePayloadNumber($row['delivery_wo_qty'] ?? null),
+        'wo_qty' => nullablePayloadNumber($row['delivery_mnf_qty'] ?? $row['delivery_wo_qty'] ?? null),
+        'mnf_qty' => nullablePayloadNumber($row['delivery_mnf_qty'] ?? $row['delivery_wo_qty'] ?? null),
         'mnf_weight' => nullablePayloadNumber($row['mnf_weight'] ?? null),
         'fix_anc_weight' => nullablePayloadNumber($row['fix_anc_weight'] ?? null),
         'previous_mnf_weight' => nullablePayloadNumber($row['previous_mnf_weight'] ?? 0),

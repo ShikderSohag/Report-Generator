@@ -341,6 +341,7 @@ def main():
         "wono": delivery_note,
         "deliverynote": delivery_note,
         "woqty": None if is_fixed else total_qty,
+        "mnfqty": None if is_fixed else total_qty,
         "ductarea": total_area,
         "ductweight": None if is_fixed else total_weight,
         "mnfweight": None if is_fixed else total_weight,

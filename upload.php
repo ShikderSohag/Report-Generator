@@ -5,6 +5,7 @@ require __DIR__ . '/db.php';
 require __DIR__ . '/xlsx_reader.php';
 require __DIR__ . '/pdf_reader.php';
 require __DIR__ . '/vehicle_importer.php';
+require __DIR__ . '/delivery_note_schema.php';
 
 @set_time_limit(300);
 
@@ -380,6 +381,7 @@ function importRows(array $rows): array
 
     $pdo = db();
     ensureSchema($pdo);
+    ensureDeliveryNoteQuantitySchema($pdo);
 
     $exists = $pdo->prepare('SELECT id FROM work_orders WHERE wo_no = ? LIMIT 1');
     $insert = $pdo->prepare('
@@ -615,6 +617,8 @@ function importPdf(string $path): array
 
 function upsertDelivery(PDO $pdo, string $woNo, array $raw): void
 {
+    ensureDeliveryNoteQuantitySchema($pdo);
+
     $dnNumber = nullableText($raw['dnnumber'] ?? null);
     if ($dnNumber === null) {
         $dnNumber = 'D1';
@@ -638,15 +642,16 @@ function upsertDelivery(PDO $pdo, string $woNo, array $raw): void
 
     $insert = $pdo->prepare('
         INSERT INTO work_order_deliveries
-            (wo_no, dn_number, project_name, edd, wo_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date,
+            (wo_no, dn_number, project_name, edd, wo_qty, mnf_qty, duct_weight, mnf_weight, mnf_date, fix_anc_weight, fix_anc_date,
              duct_system, pid_area, pid_supp_rod, pid_mnf_qty, pid_material, raw_data)
         VALUES
-            (:wo_no, :dn_number, :project_name, :edd, :wo_qty, :duct_weight, :mnf_weight, :mnf_date, :fix_anc_weight, :fix_anc_date,
+            (:wo_no, :dn_number, :project_name, :edd, :wo_qty, :mnf_qty, :duct_weight, :mnf_weight, :mnf_date, :fix_anc_weight, :fix_anc_date,
              :duct_system, :pid_area, :pid_supp_rod, :pid_mnf_qty, :pid_material, :raw_data)
         ON DUPLICATE KEY UPDATE
             project_name = COALESCE(VALUES(project_name), project_name),
             edd = COALESCE(VALUES(edd), edd),
             wo_qty = COALESCE(VALUES(wo_qty), wo_qty),
+            mnf_qty = COALESCE(VALUES(mnf_qty), mnf_qty),
             duct_weight = COALESCE(VALUES(duct_weight), duct_weight),
             mnf_weight = COALESCE(VALUES(mnf_weight), mnf_weight),
             mnf_date = COALESCE(VALUES(mnf_date), mnf_date),
@@ -666,6 +671,7 @@ function upsertDelivery(PDO $pdo, string $woNo, array $raw): void
         ':project_name' => nullableText($raw['projectname'] ?? null),
         ':edd' => nullableText($raw['pdfdate'] ?? null),
         ':wo_qty' => nullableNumber($raw['woqty'] ?? null),
+        ':mnf_qty' => nullableNumber($raw['mnfqty'] ?? $raw['woqty'] ?? null),
         ':duct_weight' => nullableNumber($raw['ductweight'] ?? null),
         ':mnf_weight' => nullableNumber($raw['mnfweight'] ?? null),
         ':mnf_date' => nullableText(($raw['pdf_type'] ?? null) === 'manufactured' ? ($raw['pdfdate'] ?? null) : null),

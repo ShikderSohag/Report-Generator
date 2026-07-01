@@ -486,13 +486,14 @@ function addReportRow(data) {
     const row = document.createElement('tr');
     const mnfWeight = numberValue(data.mnf_weight);
     const fixAncWeight = numberValue(data.fix_anc_weight);
+    const mnfQty = numberValue(data.mnf_qty ?? data.wo_qty);
     const metalMaterial = normalizeMetalDuctMaterial(data.material || data.metal_material || '');
     const hasPreviousPercentOverride = data.previous_delivered_percent !== undefined
         && data.previous_delivered_percent !== null;
     row.dataset.woNo = normalizedWoNo || rowKey;
     row.dataset.rowKey = rowKey;
     row.dataset.woQty = numberValue(data.duct_weight);
-    row.dataset.mnfQty = numberValue(data.wo_qty);
+    row.dataset.mnfQty = mnfQty;
     row.dataset.previousMnfWeight = numberValue(data.previous_mnf_weight);
     row.dataset.hasDeliveryHistory = data.previous_mnf_weight === undefined || data.previous_mnf_weight === null ? '0' : '1';
     row.dataset.previousPercentOverride = hasPreviousPercentOverride
@@ -516,7 +517,7 @@ function addReportRow(data) {
         <td><input class="cell-input number manual-mnf" type="text" inputmode="decimal" value="${formatRawNumber(mnfWeight)}"></td>
         <td><input class="cell-input number manual-fix" type="text" inputmode="decimal" value="${formatRawNumber(fixAncWeight)}"></td>
         <td class="shipment-total">0 KGs</td>
-        <td><input class="cell-input number manual-mnf-qty" type="text" inputmode="decimal" value="${formatRawNumber(data.wo_qty || 0)}"></td>
+        <td><input class="cell-input number manual-mnf-qty" type="text" inputmode="decimal" value="${formatRawNumber(mnfQty)}"></td>
         <td class="shipment-percent">0%</td>
         <td><div class="percent-input"><input class="cell-input number manual-prev" type="text" inputmode="decimal" value="${hasPreviousPercentOverride ? roundedPercent(data.previous_delivered_percent) : '0'}"></div></td>
         <td class="delivered-total">0%</td>
@@ -743,7 +744,8 @@ function mergeDelivery(baseData, delivery) {
         destination: delivery.destination || baseData.destination,
         vehicle_type: delivery.vehicle_type || baseData.vehicle_type,
         edd: delivery.edd || baseData.edd,
-        wo_qty: delivery.wo_qty || baseData.wo_qty,
+        wo_qty: delivery.wo_qty ?? baseData.wo_qty,
+        mnf_qty: delivery.mnf_qty ?? delivery.wo_qty ?? baseData.mnf_qty,
         duct_weight: baseData.duct_weight,
         mnf_weight: delivery.mnf_weight || baseData.mnf_weight,
         fix_anc_weight: delivery.fix_anc_weight || baseData.fix_anc_weight,

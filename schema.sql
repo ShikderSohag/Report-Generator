@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS work_order_deliveries (
     project_name VARCHAR(255) NULL,
     edd VARCHAR(80) NULL,
     wo_qty DECIMAL(14,3) NULL,
+    mnf_qty DECIMAL(14,3) NULL,
     duct_weight DECIMAL(14,3) NULL,
     mnf_weight DECIMAL(14,3) NULL,
     fix_anc_weight DECIMAL(14,3) NULL,
